@@ -222,6 +222,11 @@ with MacClient.from_best_host() as c:
     #     "down_count": 37,
     #     "members": DataFrame(...),     # 成分股明细
     # }
+
+    # 板块涨跌幅排行榜
+    df = c.get_board_ranking(BoardType.HY, top_n=10, sort_by="change_pct")
+    df = c.get_board_ranking(BoardType.GN, top_n=20, sort_by="main_net_amount")
+    # 返回列：code, name, change_pct, amount, vol, main_net_amount, up_count, down_count, member_count
 ```
 
 #### 资金流向
@@ -404,6 +409,7 @@ bars = read_daily_bars(filepath)
 | `get_board_list(board_type, ...)` | 板块列表 |
 | `get_board_members(board_symbol, ...)` | 板块成分股报价 |
 | `get_board_summary(board_symbol, ...)` | 板块汇总（成交额、主力净流入、涨跌家数） |
+| `get_board_ranking(board_type, top_n, sort_by, ...)` | 板块涨跌幅排行榜（行业/概念排行） |
 | `get_belong_board(market, code)` | 个股所属板块 |
 | `get_capital_flow(market, code)` | 资金流向 |
 | `get_auction(market, code)` | 集合竞价 |

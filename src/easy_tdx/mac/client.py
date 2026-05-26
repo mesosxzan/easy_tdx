@@ -76,6 +76,8 @@ def _convert_board_code(board_symbol: str) -> int:
         if s.startswith("000"):
             return 31000 + int(s)
     return int(s)
+
+
 _TRANSACTION_PAGE_SIZE = 1000
 
 _T = TypeVar("_T")
@@ -393,8 +395,7 @@ class MacClient:
         from datetime import date as date_cls
 
         query_date = (
-            date_cls(date // 10000, (date % 10000) // 100, date % 100)
-            if date is not None else None
+            date_cls(date // 10000, (date % 10000) // 100, date % 100) if date is not None else None
         )
         chart = self._execute(SymbolTickChartCmd(market, code, query_date))
         return pd.DataFrame(_flatten_tick_chart(chart))
@@ -417,8 +418,7 @@ class MacClient:
         from datetime import date as date_cls
 
         start_date = (
-            date_cls(date // 10000, (date % 10000) // 100, date % 100)
-            if date is not None else None
+            date_cls(date // 10000, (date % 10000) // 100, date % 100) if date is not None else None
         )
         chart = self._execute(TickChartsCmd(market, code, start_date, days))
         return pd.DataFrame(_flatten_multi_tick_chart(chart))
@@ -457,8 +457,7 @@ class MacClient:
         from datetime import date as date_cls
 
         query_date = (
-            date_cls(date // 10000, (date % 10000) // 100, date % 100)
-            if date is not None else None
+            date_cls(date // 10000, (date % 10000) // 100, date % 100) if date is not None else None
         )
         all_items = self._execute(
             SymbolTransactionCmd(
@@ -652,6 +651,80 @@ class MacClient:
             "down_count": down_count,
             "members": df,
         }
+
+    def get_board_ranking(
+        self,
+        board_type: BoardType = BoardType.HY,
+        top_n: int = 50,
+        sort_by: str = "change_pct",
+        ascending: bool = False,
+    ) -> pd.DataFrame:
+        """获取板块涨跌幅排行榜（含成交额、成交量、资金流入流出、涨跌家数）。
+
+        先通过 ``get_board_list`` 获取全部板块，再逐个调用
+        ``get_board_summary`` 聚合成分股数据，合并为排行榜 DataFrame。
+
+        Args:
+            board_type: 板块类型（``BoardType.HY`` 行业 / ``BoardType.GN`` 概念）。
+            top_n: 聚合的板块数量上限。概念板块有 300+ 个，
+                全部聚合网络开销大，建议按需限制。
+            sort_by: 排序字段，可选 ``change_pct`` / ``amount``
+                / ``main_net_amount`` / ``vol``。
+            ascending: 排序方向，默认降序。
+
+        Returns:
+            DataFrame，列::
+
+                code             板块代码
+                name             板块名称
+                change_pct       涨跌幅%
+                amount           板块总成交额（元）
+                vol              板块总成交量（股）
+                main_net_amount  板块主力净流入（元）
+                up_count         上涨家数
+                down_count       下跌家数
+                member_count     成分股数量
+        """
+        _VALID_SORT = {"change_pct", "amount", "main_net_amount", "vol"}
+        if sort_by not in _VALID_SORT:
+            raise ValueError(f"sort_by 必须是 {_VALID_SORT} 之一， got {sort_by!r}")
+
+        boards_df = self.get_board_list(board_type)
+        if boards_df.empty:
+            return pd.DataFrame()
+
+        # 从 board_list 的 price / pre_close 计算涨跌幅
+        if "price" in boards_df.columns and "pre_close" in boards_df.columns:
+            pre = boards_df["pre_close"].replace(0, float("nan"))
+            boards_df["change_pct"] = (boards_df["price"] - boards_df["pre_close"]) / pre * 100
+        else:
+            boards_df["change_pct"] = 0.0
+
+        # 按涨跌幅初排，取 top_n 减少后续聚合开销
+        boards_df = boards_df.sort_values("change_pct", ascending=ascending).head(top_n)
+
+        rows: list[dict[str, Any]] = []
+        for _, row in boards_df.iterrows():
+            code = str(row["code"])
+            summary = self.get_board_summary(code)
+            rows.append(
+                {
+                    "code": code,
+                    "name": row.get("name", ""),
+                    "change_pct": round(float(row.get("change_pct", 0.0)), 2),
+                    "amount": summary["amount"],
+                    "vol": summary["vol"],
+                    "main_net_amount": summary["main_net_amount"],
+                    "up_count": summary["up_count"],
+                    "down_count": summary["down_count"],
+                    "member_count": summary["member_count"],
+                }
+            )
+
+        result = pd.DataFrame(rows)
+        if not result.empty:
+            result = result.sort_values(sort_by, ascending=ascending).reset_index(drop=True)
+        return result
 
     # ------------------------------------------------------------------ #
     # 资金流向
@@ -1080,8 +1153,7 @@ class AsyncMacClient:
         from datetime import date as date_cls
 
         query_date = (
-            date_cls(date // 10000, (date % 10000) // 100, date % 100)
-            if date is not None else None
+            date_cls(date // 10000, (date % 10000) // 100, date % 100) if date is not None else None
         )
         chart = await self._execute(SymbolTickChartCmd(market, code, query_date))
         return pd.DataFrame(_flatten_tick_chart(chart))
@@ -1096,8 +1168,7 @@ class AsyncMacClient:
         from datetime import date as date_cls
 
         start_date = (
-            date_cls(date // 10000, (date % 10000) // 100, date % 100)
-            if date is not None else None
+            date_cls(date // 10000, (date % 10000) // 100, date % 100) if date is not None else None
         )
         chart = await self._execute(TickChartsCmd(market, code, start_date, days))
         return pd.DataFrame(_flatten_multi_tick_chart(chart))
@@ -1121,8 +1192,7 @@ class AsyncMacClient:
         from datetime import date as date_cls
 
         query_date = (
-            date_cls(date // 10000, (date % 10000) // 100, date % 100)
-            if date is not None else None
+            date_cls(date // 10000, (date % 10000) // 100, date % 100) if date is not None else None
         )
         all_items = await self._execute(
             SymbolTransactionCmd(
@@ -1290,6 +1360,77 @@ class AsyncMacClient:
             "down_count": down_count,
             "members": df,
         }
+
+    async def get_board_ranking(
+        self,
+        board_type: BoardType = BoardType.HY,
+        top_n: int = 50,
+        sort_by: str = "change_pct",
+        ascending: bool = False,
+    ) -> pd.DataFrame:
+        """获取板块涨跌幅排行榜（含成交额、成交量、资金流入流出、涨跌家数）。
+
+        先通过 ``get_board_list`` 获取全部板块，再并发调用
+        ``get_board_summary`` 聚合成分股数据，合并为排行榜 DataFrame。
+
+        Args:
+            board_type: 板块类型（``BoardType.HY`` 行业 / ``BoardType.GN`` 概念）。
+            top_n: 聚合的板块数量上限。概念板块有 300+ 个，
+                全部聚合网络开销大，建议按需限制。
+            sort_by: 排序字段，可选 ``change_pct`` / ``amount``
+                / ``main_net_amount`` / ``vol``。
+            ascending: 排序方向，默认降序。
+
+        Returns:
+            DataFrame，列::
+
+                code             板块代码
+                name             板块名称
+                change_pct       涨跌幅%
+                amount           板块总成交额（元）
+                vol              板块总成交量（股）
+                main_net_amount  板块主力净流入（元）
+                up_count         上涨家数
+                down_count       下跌家数
+                member_count     成分股数量
+        """
+        _VALID_SORT = {"change_pct", "amount", "main_net_amount", "vol"}
+        if sort_by not in _VALID_SORT:
+            raise ValueError(f"sort_by 必须是 {_VALID_SORT} 之一， got {sort_by!r}")
+
+        boards_df = await self.get_board_list(board_type)
+        if boards_df.empty:
+            return pd.DataFrame()
+
+        if "price" in boards_df.columns and "pre_close" in boards_df.columns:
+            pre = boards_df["pre_close"].replace(0, float("nan"))
+            boards_df["change_pct"] = (boards_df["price"] - boards_df["pre_close"]) / pre * 100
+        else:
+            boards_df["change_pct"] = 0.0
+
+        boards_df = boards_df.sort_values("change_pct", ascending=ascending).head(top_n)
+
+        async def _fetch_row(row: pd.Series) -> dict[str, Any]:
+            code = str(row["code"])
+            summary = await self.get_board_summary(code)
+            return {
+                "code": code,
+                "name": row.get("name", ""),
+                "change_pct": round(float(row.get("change_pct", 0.0)), 2),
+                "amount": summary["amount"],
+                "vol": summary["vol"],
+                "main_net_amount": summary["main_net_amount"],
+                "up_count": summary["up_count"],
+                "down_count": summary["down_count"],
+                "member_count": summary["member_count"],
+            }
+
+        rows = await asyncio.gather(*[_fetch_row(row) for _, row in boards_df.iterrows()])
+
+        result = pd.DataFrame(rows)
+        if not result.empty:
+            result = result.sort_values(sort_by, ascending=ascending).reset_index(drop=True)
+        return result
 
     # ------------------------------------------------------------------ #
     # 资金流向

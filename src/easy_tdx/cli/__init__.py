@@ -19,7 +19,7 @@ from .cmd_transaction import transaction
 
 
 @click.group()
-@click.version_option(version="1.1.0", prog_name="easy-tdx")
+@click.version_option(version="1.3.0", prog_name="easy-tdx")
 def cli() -> None:
     """easy-tdx -- 通达信行情数据 CLI（默认 JSON 输出，适合 Agent 使用）。
 
