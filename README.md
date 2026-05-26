@@ -68,6 +68,10 @@ easy-tdx board-list --type GN --table
 easy-tdx board-list --type HY --count 200
 easy-tdx board-members 881001 --table
 easy-tdx belong-board SZ 000001 --table
+easy-tdx board-summary 881001 --table          # 板块汇总（成交额/主力净流入/涨跌家数）
+easy-tdx board-summary 881001 --members --table # 含成分股明细
+easy-tdx board-ranking --type HY --top 10 --table   # 行业板块排行
+easy-tdx board-ranking --type GN --sort-by amount    # 概念板块按成交额排行
 ```
 
 ### 资金 / 监控
@@ -112,6 +116,8 @@ easy-tdx ex tick HK_MAIN_BOARD 00700 --table               # 港股分时
 | `transaction` | 逐笔成交 |
 | `board-list` | 板块列表（行业/概念/风格） |
 | `board-members` | 板块成分股报价 |
+| `board-summary` | 板块汇总（成交额、主力净流入、涨跌家数） |
+| `board-ranking` | 板块涨跌幅排行榜（行业/概念排行） |
 | `belong-board` | 个股所属板块 |
 | `capital-flow` | 资金流向 |
 | `auction` | 集合竞价 |

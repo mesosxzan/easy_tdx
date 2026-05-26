@@ -104,3 +104,93 @@ def belong_board(market: str, code: str, use_table: bool, output_fmt: str) -> No
     with get_mac_client() as client:
         df = client.get_belong_board(mkt, code)
     print_output(df, fmt)
+
+
+@click.command("board-summary")
+@click.argument("board_symbol")
+@click.option(
+    "--sort", "sort_field", default="CHANGE_PCT", help="排序字段: CHANGE_PCT/CODE/PRICE/VOLUME"
+)
+@click.option("--order", "sort_order", default="DESC", help="排序方向: DESC/ASC")
+@click.option("--members", "show_members", is_flag=True, help="输出成分股明细而非汇总")
+@click.option("--table", "use_table", is_flag=True, help="表格输出")
+@click.option("--output", "output_fmt", type=click.Choice(["json", "table", "csv"]), default="json")
+def board_summary(
+    board_symbol: str,
+    sort_field: str,
+    sort_order: str,
+    show_members: bool,
+    use_table: bool,
+    output_fmt: str,
+) -> None:
+    """获取板块汇总（成交额、主力净流入、涨跌家数）。
+
+    BOARD_SYMBOL: 板块代码（如 881001）
+
+    示例：
+
+      easy-tdx board-summary 881001 --table
+
+      easy-tdx board-summary 881001 --members --table
+
+      easy-tdx board-summary 881001 --sort VOLUME --order ASC
+    """
+    import pandas as pd
+
+    from .conn import get_mac_client
+    from .output import print_output
+    from .parsers import parse_sort_order, parse_sort_type
+
+    fmt = "table" if use_table else output_fmt
+    st = parse_sort_type(sort_field)
+    so = parse_sort_order(sort_order)
+    with get_mac_client() as client:
+        result = client.get_board_summary(board_symbol, sort_type=st, sort_order=so)
+
+    if show_members:
+        members_df: pd.DataFrame = result["members"]
+        print_output(members_df, fmt)
+    else:
+        summary = {k: v for k, v in result.items() if k != "members"}
+        df = pd.DataFrame([summary])
+        print_output(df, fmt)
+
+
+@click.command("board-ranking")
+@click.option("--type", "board_type", default="HY", help="板块类型: HY/GN")
+@click.option("--top", "top_n", default=10, type=int, help="排行数量（默认 10）")
+@click.option(
+    "--sort-by",
+    default="change_pct",
+    help="排序字段: change_pct/amount/main_net_amount/vol",
+)
+@click.option("--asc", is_flag=True, help="升序（默认降序）")
+@click.option("--table", "use_table", is_flag=True, help="表格输出")
+@click.option("--output", "output_fmt", type=click.Choice(["json", "table", "csv"]), default="json")
+def board_ranking(
+    board_type: str,
+    top_n: int,
+    sort_by: str,
+    asc: bool,
+    use_table: bool,
+    output_fmt: str,
+) -> None:
+    """获取板块涨跌幅排行榜（行业/概念排行）。
+
+    示例：
+
+      easy-tdx board-ranking --table
+
+      easy-tdx board-ranking --type GN --top 20 --table
+
+      easy-tdx board-ranking --type HY --sort-by amount --asc
+    """
+    from .conn import get_mac_client
+    from .output import print_output
+    from .parsers import parse_board_type
+
+    fmt = "table" if use_table else output_fmt
+    bt = parse_board_type(board_type)
+    with get_mac_client() as client:
+        df = client.get_board_ranking(board_type=bt, top_n=top_n, sort_by=sort_by, ascending=asc)
+    print_output(df, fmt)
