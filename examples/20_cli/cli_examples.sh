@@ -380,7 +380,70 @@ echo "=== 29. 分钟 K 线技术指标 ==="
 #  2025-05-15 14:25  1521.00     0.23     0.25     -0.04
 #  ...（共10条）
 
-echo "=== 30. 常用指标快速参考 ==="
+echo "=== 30. 离线数据 - 检测通达信目录 ==="
+# 无需网络，直接读取本地通达信安装目录中的数据文件。
+# 需要本地已安装通达信并下载过对应数据。
+# easy-tdx offline home
+# 输出:
+# C:\new_jyplug
+
+echo "=== 31. 离线数据 - A 股日线 ==="
+# 通过市场+代码自动定位 .day 文件，读取本地日线数据。
+# 参数: <市场> <代码> --count N --table
+# easy-tdx offline daily SH 600000 --count 10 --table
+# 输出:
+#  datetime       open     high      low    close         vol        amount
+#  2026-05-26      9.10     9.32     9.09     9.27  1464374.54  1356643840
+#  2026-05-27      9.29     9.54     9.26     9.43  1345489.76  1269924736
+#  2026-05-28      9.42     9.46     9.14     9.21   836655.20   776320256
+#  2026-05-29      9.18     9.38     9.13     9.37   933303.04   869221248
+#  2026-06-01      9.32     9.35     9.20     9.32   750721.20   697403328
+
+echo "=== 32. 离线数据 - 分钟线 ==="
+# 读取本地分钟线数据，支持三种格式。
+# --type: 5min(.5) / lc1(1分钟) / lc5(5分钟)
+# easy-tdx offline min SH 600000 --count 5 --table
+# easy-tdx offline min SZ 000001 --type lc1 --count 10 --table
+# 输出:
+#  datetime           open    high     low   close        vol      amount
+#  2026-05-12 14:30   10.35   10.38   10.34   10.36   285400   295600000
+#  2026-05-12 14:35   10.36   10.40   10.35   10.38   312500   324000000
+
+echo "=== 33. 离线数据 - 扩展市场文件列表 ==="
+# 列出本地扩展市场（期货/港股/外盘）可用的日线数据文件。
+# easy-tdx offline ex-files --table
+# 输出:
+#  filename        size_kb
+#  38#1_GDP.day       0.8
+#  38#2_CPI.day       9.9
+#  29#A1801.day      12.3
+#  31#00700.day       8.5
+#  ...（共211个）
+
+echo "=== 34. 离线数据 - 扩展市场日线 ==="
+# 读取扩展市场日线数据（期货/港股/外盘指数等）。
+# 参数: <文件名>（不含 .day 后缀）
+# easy-tdx offline ex-daily 38#2_CPI --count 5 --table
+# easy-tdx offline ex-daily 29#A1801 --table
+# 输出:
+#  datetime     open    high     low   close   vol  settlement
+#  2025-12-31  100.80  100.80  100.80  100.80     0        0.0
+#  2026-01-31  100.20  100.20  100.20  100.20     0        0.0
+#  2026-02-28  101.30  101.30  101.30  101.30     0        0.0
+
+echo "=== 35. 离线数据 - 股本变迁 ==="
+# 读取本地股本变迁文件（分红/送股/配股等历史记录）。
+# easy-tdx offline gbbq C:\new_jyplug\T0002\hq_cache\gbbq --count 10 --table
+
+echo "=== 36. 离线数据 - 历史财务 ==="
+# 读取本地历史财务数据（gpcw*.dat / gpcw*.zip）。
+# easy-tdx offline financial C:\new_jyplug\vipdoc\fin\gpcw20260331.dat --count 5 --table
+
+echo "=== 37. 离线数据 - 自定义板块 ==="
+# 读取本地自定义板块数据。
+# easy-tdx offline blocks C:\new_jyplug\T0002\blocknew --table
+
+echo "=== 38. 常用指标快速参考 ==="
 # MACD:  easy-tdx indicator MACD -m SH -c 600519 --table
 # KDJ:   easy-tdx indicator KDJ -m SZ -c 000001 --table
 # RSI:   easy-tdx indicator RSI -m SH -c 600519 --table

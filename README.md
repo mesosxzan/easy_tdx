@@ -213,6 +213,21 @@ easy-tdx ex quote-list HK_MAIN_BOARD --table               # 港股商品列表
 easy-tdx ex tick HK_MAIN_BOARD 00700 --table               # 港股分时
 ```
 
+### 离线数据（无需网络）
+
+从本地通达信安装目录直接读取数据文件，无需网络连接：
+
+```bash
+easy-tdx offline home                                # 检测通达信安装目录
+easy-tdx offline daily SH 600000 --count 10 --table  # A 股日线
+easy-tdx offline min SZ 000001 --type lc5 --table    # 分钟线（5min/lc1/lc5）
+easy-tdx offline ex-files --table                    # 列出扩展市场可用文件
+easy-tdx offline ex-daily 38#2_CPI --count 5 --table # 扩展市场日线（期货/港股/外盘）
+easy-tdx offline gbbq C:\new_jyplug\T0002\hq_cache\gbbq --table        # 股本变迁
+easy-tdx offline financial C:\new_jyplug\vipdoc\fin\gpcw20260331.dat    # 历史财务
+easy-tdx offline blocks C:\new_jyplug\T0002\blocknew --table            # 自定义板块
+```
+
 ## CLI 命令汇总
 
 | 命令 | 说明 |
@@ -244,6 +259,14 @@ easy-tdx ex tick HK_MAIN_BOARD 00700 --table               # 港股分时
 | `ex quote-list` | 扩展市场商品列表 |
 | `ex tick` | 扩展市场分时 |
 | `ex markets` | 列出可用扩展市场 |
+| `offline home` | 检测通达信安装目录 |
+| `offline daily` | A 股日线（本地 .day 文件） |
+| `offline min` | 分钟线（本地 .5/.lc1/.lc5 文件） |
+| `offline ex-files` | 列出扩展市场可用文件 |
+| `offline ex-daily` | 扩展市场日线（期货/港股/外盘） |
+| `offline gbbq` | 股本变迁数据 |
+| `offline financial` | 历史财务数据 |
+| `offline blocks` | 自定义板块数据 |
 
 ## Python API
 
@@ -520,6 +543,14 @@ bars = read_daily_bars(filepath)
 
 支持：日线、分钟线、扩展市场日线、板块、股本变迁、历史财务数据。
 
+v1.5.0 起可通过 CLI 直接使用：
+
+```bash
+easy-tdx offline daily SH 600000 --count 10 --table
+easy-tdx offline ex-files --table
+easy-tdx offline ex-daily 29#A1801 --table
+```
+
 ## 枚举参考
 
 ### Period（K 线周期）
@@ -715,6 +746,19 @@ ruff format --check src/ tests/                              # format check
 详见 [NOTICE](NOTICE) 和 [LICENSE](LICENSE)。
 
 ## Changelog
+
+### 1.5.0 (2026-06-02)
+
+**离线数据 CLI 命令** — 新增 `offline` 命令组，无需网络即可通过 CLI 读取本地通达信数据文件。
+
+- 新增 `offline home`：检测通达信安装目录
+- 新增 `offline daily`：A 股日线数据（.day 文件）
+- 新增 `offline min`：分钟线数据（.5/.lc1/.lc5 文件，`--type` 指定格式）
+- 新增 `offline ex-files`：列出扩展市场可用日线文件
+- 新增 `offline ex-daily`：扩展市场日线数据（期货/港股/外盘）
+- 新增 `offline gbbq`：股本变迁数据
+- 新增 `offline financial`：历史财务数据
+- 新增 `offline blocks`：自定义板块数据
 
 ### 1.4.3 (2026-05-28)
 

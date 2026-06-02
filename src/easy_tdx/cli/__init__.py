@@ -10,17 +10,18 @@ from .cmd_board import belong_board, board_list, board_members, board_ranking, b
 from .cmd_capital import capital_flow
 from .cmd_ex import ex
 from .cmd_finance import f10, fund_flow
-from .cmd_info import server_info, symbol_info
 from .cmd_indicator import indicator, indicator_list
+from .cmd_info import server_info, symbol_info
 from .cmd_kline import kline
 from .cmd_monitor import market_stat, unusual
+from .cmd_offline import offline
 from .cmd_quote import quote, quote_list
 from .cmd_tick import tick
 from .cmd_transaction import transaction
 
 
 @click.group()
-@click.version_option(version="1.4.0", prog_name="easy-tdx")
+@click.version_option(version="1.5.0", prog_name="easy-tdx")
 def cli() -> None:
     """easy-tdx -- 通达信行情数据 CLI（默认 JSON 输出，适合 Agent 使用）。
 
@@ -62,3 +63,4 @@ cli.add_command(fund_flow)
 cli.add_command(ex)
 cli.add_command(indicator)
 cli.add_command(indicator_list)
+cli.add_command(offline)
