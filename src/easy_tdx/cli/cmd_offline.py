@@ -459,8 +459,26 @@ def _df_to_bars(df: pd.DataFrame) -> list[SecurityBar]:
     return bars
 
 
+def _is_index_code(exchange: str, code: str) -> bool:
+    """根据市场和代码前缀判断是否为指数。
+
+    指数需要调用 get_index_bars()（服务端响应每条记录多 4 字节），
+    而非 get_security_bars()。
+    """
+    head = code[:2]
+    if exchange == "sh":
+        return head in ("00", "88", "99")
+    if exchange == "sz":
+        return head == "39"
+    return False
+
+
 def _fetch_all_daily_bars(
-    client: TdxClient, market: int, code: str, need_full: bool = False
+    client: TdxClient,
+    market: int,
+    code: str,
+    need_full: bool = False,
+    is_index: bool = False,
 ) -> list[SecurityBar]:
     """从服务端分页获取全部日线数据。
 
@@ -470,11 +488,14 @@ def _fetch_all_daily_bars(
         code: 6 位股票代码。
         need_full: True 表示拉取全量历史（空文件场景），
                    False 表示只拉最近一页（增量更新）。
+        is_index: True 表示指数，使用 get_index_bars()。
 
     Returns:
         SecurityBar 列表（按日期升序）。
     """
     from ..models.enums import KlineCategory
+
+    fetch_fn = client.get_index_bars if is_index else client.get_security_bars
 
     all_bars: list[SecurityBar] = []
     start = 0
@@ -482,7 +503,7 @@ def _fetch_all_daily_bars(
     max_pages = 50 if need_full else 1  # 50 页 = 40000 条，足够覆盖 A 股全部历史
 
     for _ in range(max_pages):
-        df = client.get_security_bars(market, code, KlineCategory.DAY, start, page_size)
+        df = fetch_fn(market, code, KlineCategory.DAY, start, page_size)
         if df.empty:
             break
         all_bars.extend(_df_to_bars(df))
@@ -517,8 +538,11 @@ def _sync_one_daily(client: TdxClient, filepath: Path) -> tuple[int, str]:
     last_date = get_last_bar_date(filepath)
     need_full = last_date is None
 
+    # 判断是否为指数（指数需要 get_index_bars，响应格式不同）
+    is_index = _is_index_code(exchange, code)
+
     # 从服务端分页获取日线
-    bars = _fetch_all_daily_bars(client, market, code, need_full=need_full)
+    bars = _fetch_all_daily_bars(client, market, code, need_full=need_full, is_index=is_index)
     if not bars:
         return 0, "服务端无数据"
 

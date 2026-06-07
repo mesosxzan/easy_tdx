@@ -785,6 +785,14 @@ ruff format --check src/ tests/                              # format check
 
 ## Changelog
 
+### 1.6.1 (2026-06-07)
+
+**Bug 修复** — 修复 sync-all/sync-daily 对指数文件误用股票解析器导致垃圾日期的问题。
+
+- 修复 `_fetch_all_daily_bars` 对指数文件（sh00/sh88/sh99, sz39）错误调用 `get_security_bars()` 的问题
+- 指数文件现在正确使用 `get_index_bars()`（服务端响应每条记录多 4 字节上涨/下跌家数）
+- 新增 `_is_index_code()` 辅助函数，根据市场和代码前缀判断证券类型
+
 ### 1.6.0 (2026-06-07)
 
 **离线数据写入同步** — 从服务端获取最新日线数据并写入本地通达信 .day 文件，替代通达信内置下载功能。
