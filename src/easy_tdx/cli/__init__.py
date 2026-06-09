@@ -23,7 +23,7 @@ from ..backtest.cli import backtest
 
 
 @click.group()
-@click.version_option(version="1.7.0", prog_name="easy-tdx")
+@click.version_option(version="1.8.0", prog_name="easy-tdx")
 def cli() -> None:
     """easy-tdx -- 通达信行情数据 CLI（默认 JSON 输出，适合 Agent 使用）。
 

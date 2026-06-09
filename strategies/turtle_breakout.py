@@ -16,7 +16,7 @@ class TurtleStrategy(Strategy):
     """海龟交易法（唐安奇通道突破）策略。"""
 
     def init(self) -> None:
-        self.upper, self.lower = self.I(MyTT.TAQ, self.data.high, self.data.low, 20)
+        self.upper, _, self.lower = self.I(MyTT.TAQ, self.data.high, self.data.low, 20)
 
     def next(self) -> None:
         cur = self.data.close[0]

@@ -76,7 +76,9 @@
       "Bash(mypy src/easy_tdx/backtest/types.py)",
       "Bash(mypy tests/unit/test_backtest_types.py)",
       "Bash(mypy src/easy_tdx/backtest/types.py tests/unit/test_backtest_types.py)",
-      "Bash(mypy *)"
+      "Bash(mypy *)",
+      "Bash(git diff *)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

@@ -19,7 +19,7 @@ class Signal:
     """策略产生的交易信号。
 
     Attributes:
-        datetime: 信号时间（Unix timestamp 毫秒）
+        datetime: 信号时间（YYYYMMDD 整数格式，如 20240101）
         direction: 交易方向
         size: 交易数量（0 = 全仓/清仓）
         price: 限价（None = 市价单）
@@ -43,7 +43,7 @@ class Trade:
     """已成交记录。
 
     Attributes:
-        datetime: 成交时间（Unix timestamp 毫秒）
+        datetime: 成交时间（YYYYMMDD 整数格式，如 20240101）
         direction: 交易方向
         size: 成交数量
         price: 成交价格
@@ -71,7 +71,7 @@ class Position:
     """持仓快照。
 
     Attributes:
-        datetime: 快照时间（Unix timestamp 毫秒）
+        datetime: 快照时间（YYYYMMDD 整数格式，如 20240101）
         size: 持仓数量（正=多头，负=空头，0=空仓）
         avg_price: 平均持仓成本
         market_value: 市值

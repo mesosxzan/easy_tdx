@@ -14,13 +14,15 @@ easy-tdx 要做的事很简单：**把机构的数据锁砸开，扔到每个普
 它是一个完全免费、无需注册、无需 API Key、纯开源的行**情核武器**。  
 一行命令，A股、港股、美股、期货——K线、报价、资金流向、板块轮动、分时明细、逐笔成交，**毫秒级拉满**。
 
-**32个技术指标**（MACD、KDJ、RSI、BOLL……连“捉妖大师”和“30日乖离率信号”都给你算好）开箱即用。  
+**32个技术指标**（MACD、KDJ、RSI、BOLL……连”捉妖大师”和”30日乖离率信号”都给你算好）开箱即用。
 **缠论分析**（笔、中枢、买卖点、背驰）一键出结果——你不再需要手画分型、猜线段。
+**内置回测引擎**——写个策略文件，一行命令跑回测，9 个经典策略自带，批量对比哪个最赚钱一目了然。
 
 装上就能跑。**Python API + CLI 双通道**，输出 JSON 天然喂给 AI Agent：Claude Code、OpenClaw、Hermes 直接吃。
 
-**你不懂 TCP 协议？不用。**  
-**你不会写量化框架？不用。**  
+**你不懂 TCP 协议？不用。**
+**你不会写量化框架？不用。**
+**你想回测验证策略？自带引擎，不用。**
 **你不想给任何平台付一分钱？完全不用。**
 
 `pip install easy-tdx`，30秒后——你屏幕上的数据，和机构看到的**是同一份**。
@@ -265,6 +267,120 @@ easy-tdx chanlun SZ 000001 --period 30MIN
 
 `[✓]` 表示确认背驰。趋势背驰(上)代表上涨趋势可能结束，趋势背驰(下)代表下跌趋势可能结束。
 
+### 回测引擎
+
+内置向量回测引擎，加载 Python 策略文件即可跑回测。策略继承 `Strategy` 基类，在 `init()` 注册指标，在 `next()` 逐 bar 生成买卖信号，引擎完成订单模拟、持仓跟踪和绩效分析。
+
+**单策略回测：**
+
+```bash
+easy-tdx backtest SZ 300308 --strategy-file strategies/expma_cross.py --count 2000 --cash 1000000 --adjust QFQ --table
+```
+
+输出示例：
+
+```
+=== 回测绩效概要 ===
+总收益率: 1413.51%
+年化收益: 40.85%
+最大回撤: 76.75%
+夏普比率: 0.88
+胜率: 20.8%
+交易次数: 24
+```
+
+**全策略批量对比：**
+
+项目自带 `run_all_strategies.py`，一次跑完 `strategies/` 下所有策略并排名：
+
+```bash
+python -X utf8 run_all_strategies.py SZ 300308 --count 2000 --cash 1000000 --adjust QFQ
+```
+
+输出示例（以 SZ 300308 为例）：
+
+```
+发现 9 个策略文件
+标的: SZ 300308 | K线: 2000 | 资金: 1,000,000 | 复权: QFQ
+================================================================================
+
+>> 运行策略: bias_reversal ... 完成 (2.4s)
+>> 运行策略: bollinger_breakout ... 完成 (0.6s)
+>> 运行策略: expma_cross ... 完成 (0.6s)
+>> 运行策略: kdj_golden ... 完成 (0.1s)
+>> 运行策略: ma_cross ... 完成 (1.4s)
+>> 运行策略: macd_cross ... 完成 (2.1s)
+>> 运行策略: rsi_reversal ... 完成 (0.2s)
+>> 运行策略: turtle_breakout ... 完成 (0.1s)
+>> 运行策略: volume_price ... 完成 (6.3s)
+
+================================================================================
+[*] 策略绩效排名 (按总收益率降序)
+================================================================================
+  排名  策略                           总收益率       年化收益       最大回撤       夏普       胜率     交易次数      盈亏比
+----------------------------------------------------------------------------------------------------
+ *1* 1  expma_cross             1413.51%    40.85%    76.75%     0.88   20.8%       24     6.45
+ *2* 2  ma_cross                1258.07%    38.94%    58.01%     0.87   38.2%       55     2.21
+ *3* 3  turtle_breakout          905.07%    33.76%    48.30%     0.83   75.0%        4    10.14
+     4  bias_reversal            504.94%    25.47%    42.25%     0.70   66.3%       95     2.08
+     5  macd_cross               387.67%    22.11%    61.08%     0.60   40.0%       85     2.20
+     6  volume_price             247.72%    17.01%    65.73%     0.50   43.3%      254     1.40
+     7  bollinger_breakout       169.65%    13.32%    49.71%     0.44   66.7%       24     1.93
+     8  rsi_reversal              95.89%     8.85%    56.51%     0.33   57.1%        7     2.48
+     9  kdj_golden                89.10%     8.36%    61.86%     0.32   66.7%        3    10.49
+```
+
+综合评分（夏普 × 0.4 + 收益/回撤 × 0.3 + 胜率 × 0.3）：
+
+```
+ *1* 1  turtle_breakout             23.04     0.83       0.70   75.0%
+ *2* 2  bias_reversal               20.35     0.70       0.60   66.3%
+ *3* 3  bollinger_breakout          20.26     0.44       0.27   66.7%
+```
+
+换一个标的再跑：
+
+```bash
+# 贵州茅台
+python -X utf8 run_all_strategies.py SH 600519 --count 2000 --cash 1000000 --adjust QFQ
+```
+
+#### 自带策略示例
+
+`strategies/` 目录下有 9 个开箱即用的策略文件，可直接用于 `--strategy-file`：
+
+| 文件 | 策略 | 类型 | 适合行情 |
+|------|------|------|----------|
+| `ma_cross.py` | 双均线交叉（MA5/MA20） | 趋势跟踪 | 单边趋势 |
+| `expma_cross.py` | EMA12/EMA50 交叉 | 趋势跟踪 | 单边趋势（比 MA 更灵敏） |
+| `macd_cross.py` | MACD 金叉死叉 | 趋势跟踪 | 中长线趋势 |
+| `bollinger_breakout.py` | 布林带突破 | 震荡反转 | 横盘震荡 |
+| `rsi_reversal.py` | RSI 超买超卖 | 反转 | 震荡市 |
+| `kdj_golden.py` | KDJ 低位金叉/高位死叉 | 反转 | 短线震荡 |
+| `turtle_breakout.py` | 海龟交易法（唐安奇通道） | 趋势突破 | 牛市启动 |
+| `bias_reversal.py` | 乖离率反转 | 反转 | 震荡回归 |
+| `volume_price.py` | 量价配合 | 综合判断 | 放量突破 |
+
+编写自定义策略只需继承 `Strategy` 基类：
+
+```python
+from easy_tdx.backtest import Strategy
+from easy_tdx import MyTT
+
+
+class MyStrategy(Strategy):
+    def init(self):
+        self.ma = self.I(MyTT.MA, self.data.close, 10)
+
+    def next(self):
+        if self.data.close[0] > self.ma[self._bar_index]:
+            self.buy(size=0)     # size=0 表示全仓
+        elif self.position["size"] > 0:
+            self.sell(size=0)    # size=0 表示清仓
+```
+
+完整 API 参考：[docs/backtest_usage.md](docs/backtest_usage.md)
+
 ### 捉妖大师（重点）
 
 捉妖大师是多周期涨幅共振指标，通过 20/60/120 日涨幅及指数平滑判断短中长线趋势是否同向，用于筛选趋势刚启动的强势股。
@@ -416,6 +532,7 @@ easy-tdx offline sync-all
 | `symbol-info` | 个股特征快照 |
 | `indicator` | 技术指标计算（32 个：MACD/KDJ/RSI/BOLL/DMI/ATR...） |
 | `indicator-list` | 列出可用技术指标 |
+| `backtest` | 回测引擎（加载策略文件，输出绩效报告） |
 | `f10` | F10 公司信息 |
 | `fund-flow` | 历史资金流向 |
 | `ex kline` | 扩展市场 K 线 |
@@ -935,6 +1052,7 @@ src/easy_tdx/
 ├── commands/          # 标准协议命令（无 IO）
 ├── codec/             # price / volume / datetime / frame / bitmap 编解码
 ├── chanlun/           # 缠论技术分析（K线合并/分型/笔/线段/中枢/买卖点/背驰）
+├── backtest/          # 回测引擎（Strategy基类/向量化引擎/绩效分析）
 ├── models/            # 纯 dataclass，无业务逻辑
 ├── offline/           # 离线数据读写模块（读取 + 写入同步）
 └── cli/               # easy-tdx CLI（click）
@@ -962,6 +1080,18 @@ ruff format --check src/ tests/                              # format check
 详见 [NOTICE](NOTICE) 和 [LICENSE](LICENSE)。
 
 ## Changelog
+
+### 1.8.0 (2026-06-09)
+
+**回测引擎** — 内置向量回测引擎，支持自定义策略回测和全策略批量对比。
+
+- 新增 `backtest` 子包：Strategy 基类、BacktestEngine、OrderSimulator、PortfolioTracker、PerformanceAnalyzer
+- 新增 `easy-tdx backtest` CLI 命令，支持 `--strategy-file`、`--cash`、`--commission`、`--adjust` 等参数
+- 绩效报告包含 19 项指标：总收益率、年化收益、最大回撤、夏普比率、索提诺、卡玛、胜率、盈亏比等
+- 新增 `strategies/` 目录，包含 9 个开箱即用的策略示例（MA/EMA/MACD/BOLL/RSI/KDJ/BIAS/海龟/量价）
+- 新增 `run_all_strategies.py` 批量对比脚本，一键跑完全部策略并按收益率和综合评分排名
+- 自带策略在 SZ 300308 上 3 年回测：收益率最高 1413%（expma_cross），综合最优 turtle_breakout
+- 30+ 离线单元测试覆盖，零网络依赖
 
 ### 1.7.1 (2026-06-08)
 

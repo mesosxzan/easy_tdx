@@ -46,17 +46,12 @@ class PortfolioTracker:
         Args:
             trades: 交易列表
         """
-        # 构建 datetime → Trade 映射
-        buy_map: dict[int, Trade] = {}
-        sell_map: dict[int, Trade] = {}
-
+        # 构建 datetime → [Trade] 映射（支持同 bar 多笔交易）
+        trade_map: dict[int, list[Trade]] = {}
         for trade in trades:
             if trade.rejected:
                 continue
-            if trade.direction == "BUY":
-                buy_map[trade.datetime] = trade
-            else:
-                sell_map[trade.datetime] = trade
+            trade_map.setdefault(trade.datetime, []).append(trade)
 
         # 遍历每个 bar
         for i in range(self._n):
@@ -68,33 +63,32 @@ class PortfolioTracker:
                 self._position[i] = self._position[i - 1]
                 self._avg_price[i] = self._avg_price[i - 1]
 
-            # 处理买入
-            if dt in buy_map:
-                trade = buy_map[dt]
-                cost = trade.size * trade.price + trade.commission + trade.slippage
-                self._cash[i] -= cost
+            # 处理该 bar 的所有交易
+            for trade in trade_map.get(dt, []):
+                if trade.direction == "BUY":
+                    cost = trade.size * trade.price + trade.commission + trade.slippage
+                    self._cash[i] -= cost
 
-                # 更新均价
-                if self._position[i] > 0:
-                    total_cost = self._position[i] * self._avg_price[i] + trade.size * trade.price
-                    self._position[i] += trade.size
-                    self._avg_price[i] = total_cost / self._position[i]
-                else:
-                    # 新开仓或从空仓开仓
-                    self._position[i] = trade.size
-                    self._avg_price[i] = trade.price
+                    # 更新均价
+                    if self._position[i] > 0:
+                        prev_cost = self._position[i] * self._avg_price[i]
+                        total_cost = prev_cost + trade.size * trade.price
+                        self._position[i] += trade.size
+                        self._avg_price[i] = total_cost / self._position[i]
+                    else:
+                        # 新开仓或从空仓开仓
+                        self._position[i] = trade.size
+                        self._avg_price[i] = trade.price
 
-            # 处理卖出
-            if dt in sell_map:
-                trade = sell_map[dt]
-                proceeds = trade.size * trade.price - trade.commission - trade.slippage
-                self._cash[i] += proceeds
-                self._position[i] -= trade.size
+                elif trade.direction == "SELL":
+                    proceeds = trade.size * trade.price - trade.commission - trade.slippage
+                    self._cash[i] += proceeds
+                    self._position[i] -= trade.size
 
-                # 清空持仓时归零
-                if self._position[i] <= 0:
-                    self._position[i] = 0.0
-                    self._avg_price[i] = 0.0
+                    # 清空持仓时归零
+                    if self._position[i] <= 0:
+                        self._position[i] = 0.0
+                        self._avg_price[i] = 0.0
 
     @property
     def equity_curve(self) -> pd.DataFrame:
