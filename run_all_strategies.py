@@ -97,18 +97,19 @@ def _run_combo_screen(
 
     from math import comb
 
+    # 单个 Runner 跨 size 复用信号缓存，避免重复提取
+    runner = CombinationRunner(
+        strategy_classes=strategy_classes,
+        df=df,
+        cash=cash,
+        commission=commission,
+    )
+
     for size in combo_sizes:
         total = comb(len(strategy_classes), size)
         click.echo("\n" + "=" * 80)
         click.echo(f"[*] {size}因子组合回测 (共{total}组, 模式={combo_mode})")
         click.echo("=" * 80)
-
-        runner = CombinationRunner(
-            strategy_classes=strategy_classes,
-            df=df,
-            cash=cash,
-            commission=commission,
-        )
 
         results = runner.screen(combo_sizes=(size,), mode=combo_mode.upper())
 

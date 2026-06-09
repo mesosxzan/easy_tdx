@@ -398,6 +398,8 @@ class CombinationRunner:
         Args:
             combo_sizes: 要尝试的组合大小（如 (2, 3) 表示 2 因子和 3 因子组合）
             mode: 信号合并模式（AND / OR / MAJORITY）
+                注意：MAJORITY 模式下 2 因子需要两个都同意（等同 AND），
+                因为阈值 = 2/2 = 1.0，需 > 1.0 才触发。
             filter_zero_trades: 是否过滤零交易组合
             top_n: 只返回前 N 名（0 = 全部返回）
 
@@ -412,16 +414,9 @@ class CombinationRunner:
                 continue
 
             for combo in itertools.combinations(range(n_factors), size):
+                result = self.run_combination(combo, mode=mode)
+
                 signals = [self._get_factor_signals(i) for i in combo]
-
-                # 合并信号
-                buy_mask, sell_mask = combine_masks(signals, mode=mode)
-
-                # 包装为策略并运行
-                combo_cls = _make_combo_strategy(buy_mask, sell_mask)
-                engine = self._make_engine(combo_cls)
-                result = engine.run(self._df)
-
                 name = " + ".join(s.name for s in signals)
 
                 results.append(
