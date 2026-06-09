@@ -43,4 +43,5 @@ def ping(timeout: float, use_table: bool, output_fmt: str) -> None:
 @click.command()
 def version() -> None:
     """显示版本号。"""
-    click.echo("easy-tdx 1.1.0")
+    ver = __import__("importlib.metadata", fromlist=["version"]).version("easy-tdx")
+    click.echo(f"easy-tdx {ver}")
