@@ -289,7 +289,7 @@ class BacktestEngine:
             BacktestResult with empty DataFrames
         """
         perf = PerformanceAnalyzer(
-            pd.DataFrame(columns=["total", "drawdown"]),
+            pd.DataFrame(columns=["total", "drawdown", "drawdown_pct"]),
             pd.DataFrame(columns=["direction", "pnl", "rejected"]),
         ).compute()
 

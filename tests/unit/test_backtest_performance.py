@@ -31,11 +31,13 @@ def _make_equity_curve(n: int = 252, total_return: float = 0.1) -> pd.DataFrame:
     # 计算回撤
     peak = np.maximum.accumulate(total)
     drawdown = peak - total
+    drawdown_pct = np.divide(drawdown, peak, out=np.zeros_like(drawdown), where=(peak != 0))
 
     return pd.DataFrame({
         "datetime": np.arange(n),
         "total": total,
         "drawdown": drawdown,
+        "drawdown_pct": drawdown_pct,
     })
 
 
@@ -63,6 +65,35 @@ def test_total_return() -> None:
 
     # 总收益率应接近 0.1（10%）
     assert abs(metrics["total_return"] - 0.1) < 0.01
+
+
+def test_max_drawdown_never_exceeds_100_pct() -> None:
+    """测试最大回撤永远不超过 100%（从峰值的跌幅）。"""
+    # 模拟先涨 5 倍再腰斩的资金曲线
+    total = np.concatenate([
+        np.linspace(100000, 600000, 126),   # 涨到 60 万
+        np.linspace(600000, 300000, 126),   # 跌到 30 万
+    ])
+    peak = np.maximum.accumulate(total)
+    drawdown = peak - total
+    drawdown_pct = np.divide(drawdown, peak, out=np.zeros_like(drawdown), where=(peak != 0))
+
+    equity = pd.DataFrame({
+        "datetime": np.arange(252),
+        "total": total,
+        "drawdown": drawdown,
+        "drawdown_pct": drawdown_pct,
+    })
+    trades = _make_trades()
+
+    analyzer = PerformanceAnalyzer(equity, trades)
+    metrics = analyzer.compute()
+
+    # 最大回撤 = 从峰值跌 50%（30万 / 60万），不应超过 1.0
+    assert 0.0 <= metrics["max_drawdown"] <= 1.0, (
+        f"max_drawdown = {metrics['max_drawdown']:.2%}, should be in [0, 100%]"
+    )
+    assert abs(metrics["max_drawdown"] - 0.5) < 0.01
 
 
 def test_max_drawdown_zero_when_monotonic() -> None:
@@ -163,7 +194,7 @@ def test_all_keys_present() -> None:
 
 def test_empty_equity_curve() -> None:
     """测试空资金曲线返回全零指标。"""
-    equity = pd.DataFrame({"total": [], "drawdown": []})
+    equity = pd.DataFrame({"total": [], "drawdown": [], "drawdown_pct": []})
     trades = _make_trades()
 
     analyzer = PerformanceAnalyzer(equity, trades)
@@ -175,7 +206,7 @@ def test_empty_equity_curve() -> None:
 
 def test_single_point_equity_curve() -> None:
     """测试只有一个点的资金曲线返回全零指标。"""
-    equity = pd.DataFrame({"total": [100000], "drawdown": [0]})
+    equity = pd.DataFrame({"total": [100000], "drawdown": [0], "drawdown_pct": [0.0]})
     trades = _make_trades()
 
     analyzer = PerformanceAnalyzer(equity, trades)

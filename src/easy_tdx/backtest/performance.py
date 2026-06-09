@@ -94,9 +94,9 @@ class PerformanceAnalyzer:
         n = len(daily_ret)
         annual_return = (1 + total_return) ** (self.ANNUAL_DAYS / n) - 1
 
-        # 3. 最大回撤
-        max_drawdown_value = np.max(drawdown)
-        max_drawdown = max_drawdown_value / total[0] if total[0] != 0 else 0
+        # 3. 最大回撤（从峰值的最大跌幅百分比，0~1 之间）
+        drawdown_pct = self._equity_curve["drawdown_pct"].to_numpy()
+        max_drawdown = float(np.max(drawdown_pct))
 
         # 4. 最大回撤持续时间
         max_dd_duration = self._compute_max_dd_duration(total, drawdown)
