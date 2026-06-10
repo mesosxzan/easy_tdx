@@ -1308,6 +1308,15 @@ ruff format --check src/ tests/                              # format check
 
 ## Changelog
 
+### 1.9.8 (2026-06-11)
+
+**CI 修复** — 修复 CI 流水线 ruff 和 pytest 配置问题。
+
+- 修复 `MyTT.pyi` 类型存根文件行过长导致 ruff check 失败（`.pyi` 文件排除 ruff 检查）
+- 添加 `pytest-asyncio` 依赖，修复 `test_realtime.py` 异步测试报错
+- 修复 `test_backtest_engine.py` 中未使用变量 `result` 的 lint 警告
+- 380 个测试全部通过，CI 全绿
+
 ### 1.9.7 (2026-06-11)
 
 **CLI 全量集成** — v1.9.6 新增的 6 项功能全部暴露到 CLI，修复缠论多级别联立的 client 生命周期 bug。
