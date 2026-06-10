@@ -72,15 +72,23 @@ class OrderSimulator:
             if bar_idx is None:
                 continue
 
-            # 确定成交的 K 线索引
-            exec_idx = self._resolve_exec_index(bar_idx)
-            if exec_idx is None or exec_idx >= len(self.df):
-                continue
+            # 当信号指定了价格（止损/止盈/限价单），
+            # 直接在信号所在 bar 以信号价格成交
+            if signal.price is not None:
+                exec_idx: int = bar_idx
+                price: float = signal.price
+            else:
+                # 确定成交的 K 线索引
+                exec_idx_raw = self._resolve_exec_index(bar_idx)
+                if exec_idx_raw is None or exec_idx_raw >= len(self.df):
+                    continue
+                exec_idx = exec_idx_raw
 
-            # 获取成交价
-            price = self._get_price(exec_idx, signal.direction)
-            if price is None:
-                continue
+                # 获取成交价
+                price_raw = self._get_price(exec_idx, signal.direction)
+                if price_raw is None:
+                    continue
+                price = price_raw
 
             # 执行交易
             if signal.direction == "BUY":

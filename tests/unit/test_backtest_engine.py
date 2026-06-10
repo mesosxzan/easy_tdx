@@ -357,3 +357,142 @@ def test_position_aware_no_duplicate_buys():
                         f"Suspicious tiny buy {cur_size} after {prev_size} — "
                         f"position feedback may be broken"
                     )
+
+
+# ── Stop-Loss / Take-Profit ──────────────────────────────────────────────────
+
+
+def _make_flat_df(n: int = 30, base_price: float = 100.0) -> pd.DataFrame:
+    """Generate flat OHLCV data at constant price for SL/TP testing."""
+    dates = pd.date_range("2024-01-01", periods=n, freq="D")
+    return pd.DataFrame(
+        {
+            "datetime": dates,
+            "open": [base_price] * n,
+            "high": [base_price + 2.0] * n,
+            "low": [base_price - 2.0] * n,
+            "close": [base_price] * n,
+            "vol": [1000000] * n,
+            "amount": [100000000] * n,
+        }
+    )
+
+
+class StopLossStrategy(Strategy):
+    """Strategy that buys with stop-loss."""
+
+    def init(self) -> None:
+        pass
+
+    def next(self) -> None:
+        if self._bar_index == 5 and self.position["size"] == 0:
+            self.buy(size=0, stop_loss=95.0)
+
+
+class TakeProfitStrategy(Strategy):
+    """Strategy that buys with take-profit."""
+
+    def init(self) -> None:
+        pass
+
+    def next(self) -> None:
+        if self._bar_index == 5 and self.position["size"] == 0:
+            self.buy(size=0, take_profit=110.0)
+
+
+class StopLossAndTakeProfitStrategy(Strategy):
+    """Strategy that buys with both stop-loss and take-profit."""
+
+    def init(self) -> None:
+        pass
+
+    def next(self) -> None:
+        if self._bar_index == 5 and self.position["size"] == 0:
+            self.buy(size=0, stop_loss=95.0, take_profit=110.0)
+
+
+def test_stop_loss_triggers_sell():
+    """Test stop-loss triggers auto SELL when price drops below stop."""
+    df = _make_flat_df(n=30)
+    # Bar 12 drops low below stop_loss=95.0
+    df.loc[12, "low"] = 93.0
+    df.loc[12, "high"] = 96.0
+    df.loc[12, "close"] = 94.0
+    df.loc[12, "open"] = 97.0
+
+    engine = BacktestEngine(StopLossStrategy, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    sell_trades = trades[trades["direction"] == "SELL"]
+
+    # Should have at least one SELL triggered by stop-loss
+    assert len(sell_trades) >= 1, "Expected stop-loss sell"
+    # Sell price should be at stop_loss price (95.0)
+    assert sell_trades.iloc[0]["price"] == 95.0
+
+
+def test_take_profit_triggers_sell():
+    """Test take-profit triggers auto SELL when price rises above target."""
+    df = _make_flat_df(n=30)
+    # Bar 12 rises above take_profit=110.0
+    df.loc[12, "high"] = 112.0
+    df.loc[12, "low"] = 108.0
+    df.loc[12, "close"] = 111.0
+    df.loc[12, "open"] = 109.0
+
+    engine = BacktestEngine(TakeProfitStrategy, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    sell_trades = trades[trades["direction"] == "SELL"]
+
+    # Should have at least one SELL triggered by take-profit
+    assert len(sell_trades) >= 1, "Expected take-profit sell"
+    # Sell price should be at take_profit price (110.0)
+    assert sell_trades.iloc[0]["price"] == 110.0
+
+
+def test_stop_loss_not_triggered_when_price_stays_above():
+    """Test no SL sell when price never drops to stop level."""
+    df = _make_flat_df(n=30, base_price=100.0)
+    # low is always 98.0 (> stop_loss=95.0), so SL never triggers
+
+    engine = BacktestEngine(StopLossStrategy, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    sell_trades = trades[trades["direction"] == "SELL"]
+
+    # No SELL should be triggered by SL (low=98 > stop_loss=95)
+    assert len(sell_trades) == 0, "SL should not trigger when price stays above"
+
+
+def test_stop_loss_takes_priority_over_strategy_sell():
+    """SL-triggered sell prevents duplicate strategy sell."""
+    df = _make_flat_df(n=30)
+
+    class SLThenManualSell(Strategy):
+        def init(self) -> None:
+            pass
+
+        def next(self) -> None:
+            if self._bar_index == 5 and self.position["size"] == 0:
+                self.buy(size=0, stop_loss=95.0)
+            # Manual sell at bar 15 — but SL should have fired first
+            if self._bar_index == 15 and self.position["size"] > 0:
+                self.sell(size=0)
+
+    # Bar 10 triggers stop-loss
+    df.loc[10, "low"] = 93.0
+    df.loc[10, "close"] = 94.0
+
+    engine = BacktestEngine(SLThenManualSell, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    sell_trades = trades[trades["direction"] == "SELL"]
+
+    # Should have exactly 1 SELL (from SL, not the manual one at bar 15)
+    assert len(sell_trades) == 1, f"Expected 1 SL sell, got {len(sell_trades)}"
+    assert sell_trades.iloc[0]["price"] == 95.0

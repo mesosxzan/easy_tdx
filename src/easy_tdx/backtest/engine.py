@@ -5,6 +5,7 @@ Coordinates Strategy → OrderSimulator → PortfolioTracker → PerformanceAnal
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
@@ -14,6 +15,19 @@ from easy_tdx.backtest.performance import PerformanceAnalyzer
 from easy_tdx.backtest.portfolio import PortfolioTracker
 from easy_tdx.backtest.strategy import Strategy
 from easy_tdx.backtest.types import BacktestResult, Signal, Trade
+
+
+@dataclass
+class _StopCondition:
+    """Active stop-loss / take-profit condition tied to an open position.
+
+    Attributes:
+        stop_loss: Price below which a SELL is triggered (None = disabled)
+        take_profit: Price above which a SELL is triggered (None = disabled)
+    """
+
+    stop_loss: float | None
+    take_profit: float | None
 
 
 class BacktestEngine:
@@ -171,17 +185,113 @@ class BacktestEngine:
 
         # Generate signals bar by bar
         all_signals: list[Signal] = []
+        active_stops: list[_StopCondition] = []
+
+        high_arr = df["high"].to_numpy()
+        low_arr = df["low"].to_numpy()
+
         for i in range(len(df)):
             strat._set_bar_index(i)
             strat._call_next()
             bar_signals = strat._clear_signals()
 
-            # Update strategy position state so next bar sees current holdings
-            self._update_strategy_position(strat, bar_signals, close_arr[i])
+            # Check existing SL/TP conditions against current bar's price range
+            sl_tp_signals = self._check_stop_conditions(
+                active_stops, high_arr[i], low_arr[i], close_arr[i], i, df
+            )
 
-            all_signals.extend(bar_signals)
+            # Combine strategy signals with SL/TP signals
+            combined = bar_signals + sl_tp_signals
+
+            # Register new SL/TP from BUY signals (after checking, so they
+            # activate on the NEXT bar — consistent with next_open execution)
+            for sig in bar_signals:
+                if sig.direction == "BUY" and (
+                    sig.stop_loss is not None or sig.take_profit is not None
+                ):
+                    active_stops.append(
+                        _StopCondition(stop_loss=sig.stop_loss, take_profit=sig.take_profit)
+                    )
+
+            # Clear conditions when a SELL occurs (strategy or SL/TP triggered)
+            for sig in combined:
+                if sig.direction == "SELL" and active_stops:
+                    active_stops.clear()
+
+            # Update strategy position state so next bar sees current holdings
+            self._update_strategy_position(strat, combined, close_arr[i])
+
+            all_signals.extend(combined)
 
         return all_signals
+
+    def _check_stop_conditions(
+        self,
+        active_stops: list[_StopCondition],
+        bar_high: float,
+        bar_low: float,
+        bar_close: float,
+        bar_index: int,
+        df: pd.DataFrame,
+    ) -> list[Signal]:
+        """Check active SL/TP conditions against current bar's price range.
+
+        If triggered, generates a SELL signal at the trigger price and removes
+        the condition. Stop-loss is checked first (conservative: assume the
+        worst case for the holder).
+
+        Args:
+            active_stops: List of active stop conditions
+            bar_high: Current bar's high price
+            bar_low: Current bar's low price
+            bar_close: Current bar's close price
+            bar_index: Current bar index
+            df: Price DataFrame (for datetime extraction)
+
+        Returns:
+            List of SELL signals triggered by SL/TP conditions
+        """
+        if not active_stops:
+            return []
+
+        signals: list[Signal] = []
+        remaining: list[_StopCondition] = []
+
+        for cond in active_stops:
+            triggered = False
+            trigger_price = 0.0
+
+            # Check stop-loss first (worst case for holder)
+            if cond.stop_loss is not None and bar_low <= cond.stop_loss:
+                triggered = True
+                trigger_price = cond.stop_loss
+            # Then check take-profit
+            elif cond.take_profit is not None and bar_high >= cond.take_profit:
+                triggered = True
+                trigger_price = cond.take_profit
+
+            if triggered:
+                # Get datetime for this bar
+                dt_val = df["datetime"].iloc[bar_index]
+                if hasattr(dt_val, "strftime"):
+                    dt_int = int(dt_val.strftime("%Y%m%d"))
+                else:
+                    dt_int = int(dt_val)
+
+                signals.append(
+                    Signal(
+                        datetime=dt_int,
+                        direction="SELL",
+                        size=0,  # full position close
+                        price=trigger_price,
+                    )
+                )
+            else:
+                remaining.append(cond)
+
+        active_stops.clear()
+        active_stops.extend(remaining)
+        return signals
 
     def _update_strategy_position(
         self, strat: Strategy, signals: list[Signal], est_price: float
