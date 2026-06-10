@@ -39,10 +39,10 @@ class GetSecurityListCmd(BaseCommand[list[SecurityInfo]]):
                 code_bytes,
                 volunit,
                 name_bytes,
-                _unknown1,    # 4字节，排序/分组字段（非用户可见数据）
+                _unknown1,  # 4字节，排序/分组字段（非用户可见数据）
                 decimal_point,
                 pre_close_raw,
-                _unknown2,    # 4字节，私有时间戳（非用户可见数据）
+                _unknown2,  # 4字节，私有时间戳（非用户可见数据）
             ) = struct.unpack("<6sH8s4sBI4s", raw)
 
             code = code_bytes.decode("utf-8", errors="replace").rstrip("\x00")

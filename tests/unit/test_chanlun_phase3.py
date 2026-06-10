@@ -13,7 +13,7 @@ from easy_tdx.chanlun.types import CLKline, Kline
 # ── helpers ──────────────────────────────────────────────────────────────
 
 
-def _k(idx: int, dt: str, o: float, c: float, h: float, l: float, a: float = 0.0) -> Kline:
+def _k(idx: int, dt: str, o: float, c: float, h: float, l: float, a: float = 0.0) -> Kline:  # noqa: E741
     return Kline(
         index=idx,
         date=datetime.strptime(dt, "%Y-%m-%d"),
@@ -55,9 +55,8 @@ class TestMultiLevel:
 
     def test_multi_level_basic(self) -> None:
         """多级别分析应返回各级别结果。"""
-        from easy_tdx.chanlun.multi_level import MultiLevelAnalyser
-
         from easy_tdx.chanlun.analyser import ChanlunAnalyser
+        from easy_tdx.chanlun.multi_level import MultiLevelAnalyser
 
         df_daily = _make_df(100)
         df_30min = _make_df(200)
@@ -77,9 +76,8 @@ class TestMultiLevel:
 
     def test_multi_level_low_level_qs(self) -> None:
         """高级别笔对应的低级别趋势信息。"""
-        from easy_tdx.chanlun.multi_level import MultiLevelAnalyser
-
         from easy_tdx.chanlun.analyser import ChanlunAnalyser
+        from easy_tdx.chanlun.multi_level import MultiLevelAnalyser
 
         df_daily = _make_df(100)
         df_30min = _make_df(200)
@@ -158,9 +156,8 @@ class TestZsd:
 
     def test_zsd_from_xds(self) -> None:
         """线段应能组合为走势段。"""
-        from easy_tdx.chanlun.zsd import find_zsds
-
         from easy_tdx.chanlun.xd import find_xds
+        from easy_tdx.chanlun.zsd import find_zsds
 
         cks = [
             CLKline(

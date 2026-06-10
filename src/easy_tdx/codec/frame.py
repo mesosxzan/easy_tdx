@@ -25,9 +25,9 @@ _HEADER_FMT = "<IIIHH"
 
 @dataclass(frozen=True)
 class FrameHeader:
-    magic: int       # 协议魔数，恒为 7654321
-    seq_id: int      # ZipFlag(1B) + 请求 bytes 1-4 回显(3B)
-    method: int      # 请求回显(1B) + 保留(1B) + Method(2B)
+    magic: int  # 协议魔数，恒为 7654321
+    seq_id: int  # ZipFlag(1B) + 请求 bytes 1-4 回显(3B)
+    method: int  # 请求回显(1B) + 保留(1B) + Method(2B)
     zipsize: int
     unzipsize: int
 

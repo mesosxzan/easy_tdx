@@ -4,7 +4,8 @@
 # V2.1  2021-6-6   新增 BARSLAST函数 SLOPE,FORCAST线性回归预测函数
 # V2.3  2021-6-13  新增 TRIX,DPO,BRAR,DMA,MTM,MASS,ROC,VR,ASI等指标
 # V2.4  2021-6-27  新增 EXPMA,OBV,MFI指标, 改进SMA核心函数(核心函数彻底无循环)
-# V2.7  2021-11-21 修正 SLOPE,BARSLAST,函数,新加FILTER,LONGCROSS, 感谢qzhjiang对SLOPE,SMA等函数的指正
+# V2.7  2021-11-21 修正 SLOPE,BARSLAST,函数,新加FILTER,LONGCROSS,
+#             感谢qzhjiang对SLOPE,SMA等函数的指正
 # V2.8  2021-11-23 修正 FORCAST,WMA函数,欢迎qzhjiang,stanene,bcq加入社群，一起来完善myTT库
 # V2.9  2021-11-29 新增 HHVBARS,LLVBARS,CONST, VALUEWHEN功能函数
 # V2.92 2021-11-30 新增 BARSSINCEN函数,现在可以 pip install MyTT 完成安装
@@ -128,7 +129,7 @@ def WMA(S, N):  # 通达信S序列的N日加权移动平均 Yn = (1*X1+2*X2+3*X3
 
 
 def DMA(S, A):  # 求S的动态移动平均，A作平滑因子,必须 0<A<1  (此为核心函数，非指标）
-    if isinstance(A, (int, float)):
+    if isinstance(A, int | float):
         return pd.Series(S).ewm(alpha=A, adjust=False).mean().values
     A = np.array(A)
     A[np.isnan(A)] = 1.0
@@ -164,7 +165,7 @@ def LAST(S, A, B):  # 从前A日到前B日一直满足S_BOOL条件, 要求A>B & 
     )
 
 
-# ------------------   1级：应用层函数(通过0级核心函数实现）使用方法请参考通达信--------------------------------
+# -- 1级：应用层函数(通过0级核心函数实现）使用方法请参考通达信 --------------------
 def COUNT(S, N):  # COUNT(CLOSE>O, N):  最近N天满足S_BOO的天数  True的天数
     return SUM(S, N)
 

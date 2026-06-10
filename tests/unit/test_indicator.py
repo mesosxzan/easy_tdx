@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from easy_tdx.indicator import compute_indicators, list_indicators, _REGISTRY
+from easy_tdx.indicator import _REGISTRY, compute_indicators, list_indicators
 
 
 def _make_ohlcv(n: int = 200, seed: int = 42) -> pd.DataFrame:
@@ -18,15 +18,17 @@ def _make_ohlcv(n: int = 200, seed: int = 42) -> pd.DataFrame:
     low = close - np.abs(rng.standard_normal(n))
     open_ = low + (high - low) * rng.random(n)
     vol = (rng.random(n) * 1e6).astype(float)
-    return pd.DataFrame({
-        "datetime": pd.date_range("2024-01-01", periods=n, freq="D"),
-        "open": open_,
-        "high": high,
-        "low": low,
-        "close": close,
-        "vol": vol,
-        "amount": vol * close,
-    })
+    return pd.DataFrame(
+        {
+            "datetime": pd.date_range("2024-01-01", periods=n, freq="D"),
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "vol": vol,
+            "amount": vol * close,
+        }
+    )
 
 
 class TestRegistry:

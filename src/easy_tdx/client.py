@@ -32,7 +32,14 @@ from .commands.security_list import GetSecurityListCmd
 from .commands.security_quotes import GetSecurityQuotesCmd
 from .commands.transaction import GetHistoryTransactionDataCmd, GetTransactionDataCmd
 from .commands.xdxr_info import GetXdxrInfoCmd
-from .config import get_best_host, get_calc_hosts, get_known_hosts, get_port, get_timeout, save_best_host
+from .config import (
+    get_best_host,
+    get_calc_hosts,
+    get_known_hosts,
+    get_port,
+    get_timeout,
+    save_best_host,
+)
 from .exceptions import TdxConnectionError
 from .models.bar import SecurityBar
 from .models.enums import KlineCategory, Market

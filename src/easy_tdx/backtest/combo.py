@@ -39,6 +39,11 @@ NDArray = np.ndarray
 BoolArray = npt.NDArray[np.bool_]
 
 
+def bool_array(x: Any) -> BoolArray:
+    """Ensure the result is a BoolArray (not a scalar bool_)."""
+    return np.asarray(x, dtype=np.bool_)
+
+
 # ── 数据结构 ────────────────────────────────────────────────────────────────
 
 
@@ -200,15 +205,15 @@ def combine_masks(
     sell_stack = np.stack(sell_arrays)
 
     if mode == "AND":
-        return np.all(buy_stack, axis=0), np.all(sell_stack, axis=0)
+        return bool_array(np.all(buy_stack, axis=0)), bool_array(np.all(sell_stack, axis=0))
     elif mode == "OR":
-        return np.any(buy_stack, axis=0), np.any(sell_stack, axis=0)
+        return bool_array(np.any(buy_stack, axis=0)), bool_array(np.any(sell_stack, axis=0))
     elif mode == "MAJORITY":
         n_factors = len(signals_list)
         threshold = n_factors / 2
         return (
-            np.sum(buy_stack, axis=0) > threshold,
-            np.sum(sell_stack, axis=0) > threshold,
+            bool_array(np.sum(buy_stack, axis=0) > threshold),
+            bool_array(np.sum(sell_stack, axis=0) > threshold),
         )
     else:
         raise ValueError(f"不支持的合并模式: {mode!r}（可选: AND, OR, MAJORITY）")

@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from easy_tdx.chanlun.config import ChanlunConfig
-from easy_tdx.chanlun.types import BC, BI, ZS, BCType
+from easy_tdx.chanlun.types import BC, BI, XD, ZS, BCType
 
 
 def check_bi_beichi(
@@ -165,7 +165,7 @@ def _check_qs_beichi(bis: list[BI], zss: list[ZS]) -> list[BC]:
     return bcs
 
 
-def _calc_bi_force(bi: BI) -> float:
+def _calc_bi_force(bi: BI | XD) -> float:
     """计算笔的力度（简化：用幅度表示）。
 
     真正的力度应用 MACD 面积，这里用幅度作为简化替代。

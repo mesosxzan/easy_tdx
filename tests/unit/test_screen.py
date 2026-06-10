@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
+
 from easy_tdx.models.bar import SecurityBar
 
 # ── 辅助：构造 SecurityBar ────────────────────────────────────────────────
@@ -300,7 +301,6 @@ class TestScanOne:
         scanner._cash = 100000.0
         scanner._commission = 0.0003
 
-        bars = _make_bars(100)
         with patch.object(scanner, "_scan_one") as mock_scan:
             # 不产生信号时返回 None
             mock_scan.return_value = None

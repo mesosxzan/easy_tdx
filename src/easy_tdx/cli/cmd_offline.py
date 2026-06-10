@@ -493,8 +493,9 @@ def _fetch_all_daily_bars(
     Returns:
         SecurityBar 列表（按日期升序）。
     """
-    from ..models.enums import KlineCategory
+    from ..models.enums import KlineCategory, Market
 
+    mkt = Market(market)
     fetch_fn = client.get_index_bars if is_index else client.get_security_bars
 
     all_bars: list[SecurityBar] = []
@@ -503,7 +504,7 @@ def _fetch_all_daily_bars(
     max_pages = 50 if need_full else 1  # 50 页 = 40000 条，足够覆盖 A 股全部历史
 
     for _ in range(max_pages):
-        df = fetch_fn(market, code, KlineCategory.DAY, start, page_size)
+        df = fetch_fn(mkt, code, KlineCategory.DAY, start, page_size)
         if df.empty:
             break
         all_bars.extend(_df_to_bars(df))

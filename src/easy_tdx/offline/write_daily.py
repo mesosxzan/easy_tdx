@@ -69,7 +69,7 @@ def get_last_bar_date(filepath: str | Path) -> int | None:
         f.seek(size - _DAILY_FMT.size)
         last_record = f.read(_DAILY_FMT.size)
     (date_int, *_) = _DAILY_FMT.unpack(last_record)
-    return date_int
+    return int(date_int)
 
 
 def _bar_date_int(bar: SecurityBar) -> int:

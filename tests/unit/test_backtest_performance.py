@@ -33,12 +33,14 @@ def _make_equity_curve(n: int = 252, total_return: float = 0.1) -> pd.DataFrame:
     drawdown = peak - total
     drawdown_pct = np.divide(drawdown, peak, out=np.zeros_like(drawdown), where=(peak != 0))
 
-    return pd.DataFrame({
-        "datetime": np.arange(n),
-        "total": total,
-        "drawdown": drawdown,
-        "drawdown_pct": drawdown_pct,
-    })
+    return pd.DataFrame(
+        {
+            "datetime": np.arange(n),
+            "total": total,
+            "drawdown": drawdown,
+            "drawdown_pct": drawdown_pct,
+        }
+    )
 
 
 def _make_trades() -> pd.DataFrame:
@@ -48,11 +50,13 @@ def _make_trades() -> pd.DataFrame:
         包含 direction, pnl, rejected 的 DataFrame
         4 条交易: BUY@100, SELL@105(pnl=500), BUY@95, SELL@90(pnl=-500)
     """
-    return pd.DataFrame({
-        "direction": ["BUY", "SELL", "BUY", "SELL"],
-        "pnl": [0, 500, 0, -500],
-        "rejected": [False, False, False, False],
-    })
+    return pd.DataFrame(
+        {
+            "direction": ["BUY", "SELL", "BUY", "SELL"],
+            "pnl": [0, 500, 0, -500],
+            "rejected": [False, False, False, False],
+        }
+    )
 
 
 def test_total_return() -> None:
@@ -70,20 +74,24 @@ def test_total_return() -> None:
 def test_max_drawdown_never_exceeds_100_pct() -> None:
     """测试最大回撤永远不超过 100%（从峰值的跌幅）。"""
     # 模拟先涨 5 倍再腰斩的资金曲线
-    total = np.concatenate([
-        np.linspace(100000, 600000, 126),   # 涨到 60 万
-        np.linspace(600000, 300000, 126),   # 跌到 30 万
-    ])
+    total = np.concatenate(
+        [
+            np.linspace(100000, 600000, 126),  # 涨到 60 万
+            np.linspace(600000, 300000, 126),  # 跌到 30 万
+        ]
+    )
     peak = np.maximum.accumulate(total)
     drawdown = peak - total
     drawdown_pct = np.divide(drawdown, peak, out=np.zeros_like(drawdown), where=(peak != 0))
 
-    equity = pd.DataFrame({
-        "datetime": np.arange(252),
-        "total": total,
-        "drawdown": drawdown,
-        "drawdown_pct": drawdown_pct,
-    })
+    equity = pd.DataFrame(
+        {
+            "datetime": np.arange(252),
+            "total": total,
+            "drawdown": drawdown,
+            "drawdown_pct": drawdown_pct,
+        }
+    )
     trades = _make_trades()
 
     analyzer = PerformanceAnalyzer(equity, trades)
@@ -287,11 +295,13 @@ def test_rejected_trades() -> None:
     equity = _make_equity_curve(n=252, total_return=0.1)
 
     # 创建包含被拒绝交易的记录
-    trades = pd.DataFrame({
-        "direction": ["BUY", "SELL", "SELL", "SELL"],
-        "pnl": [0, 500, 0, -500],
-        "rejected": [False, False, True, False],
-    })
+    trades = pd.DataFrame(
+        {
+            "direction": ["BUY", "SELL", "SELL", "SELL"],
+            "pnl": [0, 500, 0, -500],
+            "rejected": [False, False, True, False],
+        }
+    )
 
     analyzer = PerformanceAnalyzer(equity, trades)
     metrics = analyzer.compute()

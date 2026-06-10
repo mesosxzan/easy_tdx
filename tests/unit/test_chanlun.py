@@ -19,7 +19,7 @@ def _k(
     o: float,
     c: float,
     h: float,
-    l: float,
+    l: float,  # noqa: E741
     a: float = 0.0,
 ) -> Kline:
     """快速构造 Kline。"""
@@ -40,7 +40,7 @@ def _ck(
     o: float,
     c: float,
     h: float,
-    l: float,
+    l: float,  # noqa: E741
     merged_count: int = 1,
     direction: str = "",
 ) -> CLKline:

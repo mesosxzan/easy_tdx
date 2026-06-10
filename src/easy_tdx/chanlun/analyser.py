@@ -8,6 +8,7 @@ K线合并 → 分型识别 → 笔计算 → 中枢计算 → 线段 → 买卖
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import pandas as pd
 
@@ -38,10 +39,10 @@ def _df_to_klines(df: pd.DataFrame) -> list[Kline]:
             Kline(
                 index=i,
                 date=dt,
-                open=float(row.open),
-                close=float(row.close),
-                high=float(row.high),
-                low=float(row.low),
+                open=float(row.open),  # type: ignore[arg-type]
+                close=float(row.close),  # type: ignore[arg-type]
+                high=float(row.high),  # type: ignore[arg-type]
+                low=float(row.low),  # type: ignore[arg-type]
                 amount=float(vol),
             )
         )
@@ -64,7 +65,7 @@ class ChanlunResult:
     bcs: list[BC] = field(default_factory=list)
     macd: dict[str, list[float]] = field(default_factory=dict)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """将结果转为可序列化的字典（用于 JSON 输出）。"""
         return {
             "code": self.code,

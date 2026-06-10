@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 import click
 
@@ -65,7 +66,7 @@ def chanlun(
         click.echo(json.dumps(result_dict, ensure_ascii=False))
 
 
-def _print_table(result: dict) -> None:
+def _print_table(result: dict[str, Any]) -> None:
     """以表格形式输出缠论分析结果。"""
     click.echo(f"标的: {result['code']}  周期: {result['frequency']}")
     click.echo(f"原始K线: {result['kline_count']}  缠论K线: {result['ckline_count']}")

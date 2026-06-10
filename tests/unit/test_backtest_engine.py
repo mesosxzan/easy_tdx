@@ -318,7 +318,7 @@ def test_position_aware_buy_sell_alternation():
     engine = BacktestEngine(PositionAwareStrategy, cash=100000)
     result = engine.run(df)
 
-    trades = result.trades[result.trades["rejected"] == False]
+    trades = result.trades[~result.trades["rejected"]]
     directions = trades["direction"].tolist()
 
     # Must have both BUYs and SELLs
@@ -339,9 +339,7 @@ def test_position_aware_no_duplicate_buys():
     engine = BacktestEngine(PositionAwareStrategy, cash=100000)
     result = engine.run(df)
 
-    buy_trades = result.trades[
-        (result.trades["direction"] == "BUY") & (result.trades["rejected"] == False)
-    ]
+    buy_trades = result.trades[(result.trades["direction"] == "BUY") & (~result.trades["rejected"])]
 
     # Each BUY's size should be reasonable (not tiny leftover from exhausted cash)
     if len(buy_trades) > 1:

@@ -79,16 +79,15 @@ def backtest(
 
     # 1. 加载策略（单策略 or 多因子组合）
     is_combo = combo_strategies is not None
-    strategy = None
 
     if is_combo:
-        strategy = _load_combo_strategies(combo_strategies)
+        assert combo_strategies is not None  # narrowed by is_combo
+        combo_classes = _load_combo_strategies(combo_strategies)
     else:
-        strategy = _load_strategy(strategy_str, strategy_file)
-
-    if strategy is None:
-        click.echo("错误: 必须指定 --strategy-file / --combo-strategies / --strategy", err=True)
-        raise SystemExit(1)
+        strategy_cls = _load_strategy(strategy_str, strategy_file)
+        if strategy_cls is None:
+            click.echo("错误: 必须指定 --strategy-file / --combo-strategies / --strategy", err=True)
+            raise SystemExit(1)
 
     # 2. 获取数据
     mkt = parse_market(market)
@@ -111,21 +110,21 @@ def backtest(
     if is_combo:
         from ..backtest.combo import CombinationRunner
 
-        assert strategy is not None  # for type checker
         runner = CombinationRunner(
-            strategy_classes=strategy,
+            strategy_classes=combo_classes,
             df=df,
             cash=cash,
             commission=commission,
             execution=execution,
         )
         result = runner.run_combination(
-            indices=list(range(len(strategy))),
+            indices=list(range(len(combo_classes))),
             mode=combo_mode.upper(),
         )
     else:
+        assert strategy_cls is not None  # guarded above by SystemExit
         engine = BacktestEngine(
-            strategy=strategy,
+            strategy=strategy_cls,
             cash=cash,
             commission=commission,
             execution=execution,

@@ -1189,7 +1189,11 @@ class AsyncMacClient:
 
         fetch_count = max(120 + count, 200)
         df = await self.get_stock_kline(
-            market, code, period=period, count=fetch_count, adjust=adjust,
+            market,
+            code,
+            period=period,
+            count=fetch_count,
+            adjust=adjust,
         )
         if df.empty:
             return df
