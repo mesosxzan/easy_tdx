@@ -113,3 +113,64 @@ class TestConcurrentScan:
 
         assert len(progress) >= 2
         assert progress[-1][2] == "done"
+
+
+class TestIncrementalScan:
+    """测试增量扫描."""
+
+    def test_second_scan_uses_cache(self, vipdoc: Path, tmp_path: Path) -> None:
+        """第二次扫描应使用缓存, 不重新计算."""
+        cache_file = tmp_path / "scan_cache.json"
+        scanner = SignalScanner(
+            AlwaysBuyStrategy,
+            vipdoc_path=vipdoc,
+            cache_file=cache_file,
+        )
+
+        # 第一次扫描: 无缓存
+        results1 = scanner.scan(universe="all")
+        assert len(results1) >= 1
+        assert cache_file.is_file()
+
+        # 第二次扫描: 应使用缓存, 结果相同
+        results2 = scanner.scan(universe="all")
+        codes1 = sorted(r.code for r in results1)
+        codes2 = sorted(r.code for r in results2)
+        assert codes1 == codes2
+
+    def test_no_cache_file_means_full_scan(self, vipdoc: Path) -> None:
+        """无缓存文件时每次都是全量扫描."""
+        scanner = SignalScanner(AlwaysBuyStrategy, vipdoc_path=vipdoc)
+
+        results1 = scanner.scan(universe="all")
+        results2 = scanner.scan(universe="all")
+
+        codes1 = sorted(r.code for r in results1)
+        codes2 = sorted(r.code for r in results2)
+        assert codes1 == codes2
+
+    def test_cache_updated_after_file_change(self, vipdoc: Path, tmp_path: Path) -> None:
+        """文件变化后缓存应失效, 重新扫描."""
+        cache_file = tmp_path / "scan_cache.json"
+        scanner = SignalScanner(
+            AlwaysBuyStrategy,
+            vipdoc_path=vipdoc,
+            cache_file=cache_file,
+        )
+
+        # 第一次扫描
+        results1 = scanner.scan(universe="all")
+        assert len(results1) >= 1
+
+        # 修改文件 (touch mtime)
+        import time
+
+        day_file = vipdoc / "sz" / "lday" / "sz000001.day"
+        time.sleep(0.1)
+        day_file.touch()
+
+        # 第二次扫描: sz000001 应被重新扫描
+        results2 = scanner.scan(universe="all")
+        codes2 = sorted(r.code for r in results2)
+        # 结果可能相同 (策略没变), 但不应崩溃
+        assert len(codes2) >= 1

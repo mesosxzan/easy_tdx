@@ -69,6 +69,7 @@ class SignalScanner:
         vipdoc_path: str | Path | None = None,
         cash: float = 100_000.0,
         commission: float = 0.0003,
+        cache_file: str | Path | None = None,
     ) -> None:
         """初始化扫描器。
 
@@ -77,11 +78,14 @@ class SignalScanner:
             vipdoc_path: vipdoc 目录路径，None 则自动检测
             cash: 初始资金（影响全仓信号判断）
             commission: 佣金率
+            cache_file: 增量扫描缓存文件路径（JSON），
+                None 则每次全量扫描
         """
         self._strategy_cls = strategy_cls
         self._vipdoc = resolve_vipdoc(vipdoc_path)
         self._cash = cash
         self._commission = commission
+        self._cache_file = Path(cache_file) if cache_file else None
 
     def scan(
         self,
@@ -127,19 +131,60 @@ class SignalScanner:
         total: int,
         progress_callback: Any,
     ) -> list[ScanResult]:
-        """串行扫描（原有逻辑）。"""
+        """串行扫描（支持增量缓存）。"""
+        cache = self._load_cache()
         results: list[ScanResult] = []
+        updated_cache: dict[str, Any] = {}
 
         for idx, (filepath, market, code) in enumerate(files):
             if progress_callback:
                 progress_callback(idx, total, filepath.name)
 
+            # 增量检查：文件 mtime 未变则复用缓存结果
+            cache_key = str(filepath)
+            try:
+                mtime = filepath.stat().st_mtime
+            except OSError:
+                continue
+
+            cached = cache.get(cache_key)
+            if cached is not None and cached.get("mtime") == mtime:
+                result_data = cached.get("result")
+                if result_data is not None:
+                    results.append(
+                        ScanResult(
+                            code=result_data["code"],
+                            market=result_data["market"],
+                            signal_date=result_data["signal_date"],
+                            last_close=result_data["last_close"],
+                        )
+                    )
+                updated_cache[cache_key] = cached
+                continue
+
+            # 需要重新扫描
             try:
                 result = self._scan_one(filepath, market, code)
                 if result is not None:
                     results.append(result)
+                # 更新缓存
+                updated_cache[cache_key] = {
+                    "mtime": mtime,
+                    "result": (
+                        {
+                            "code": result.code,
+                            "market": result.market,
+                            "signal_date": result.signal_date,
+                            "last_close": result.last_close,
+                        }
+                        if result is not None
+                        else None
+                    ),
+                }
             except Exception:
                 continue
+
+        self._save_cache(updated_cache)
 
         if progress_callback:
             progress_callback(total, total, "done")
@@ -267,6 +312,27 @@ class SignalScanner:
                     files.append((day_file, market_str, code))
 
         return files
+
+    def _load_cache(self) -> dict[str, Any]:
+        """加载增量扫描缓存。"""
+        if self._cache_file is None or not self._cache_file.is_file():
+            return {}
+        try:
+            with open(self._cache_file, encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except (json.JSONDecodeError, OSError):
+            return {}
+
+    def _save_cache(self, cache: dict[str, Any]) -> None:
+        """保存增量扫描缓存。"""
+        if self._cache_file is None:
+            return
+        try:
+            with open(self._cache_file, "w", encoding="utf-8") as f:
+                json.dump(cache, f, ensure_ascii=False)
+        except OSError:
+            pass
 
     def _scan_one(self, filepath: Path, market: str, code: str) -> ScanResult | None:
         """扫描单只股票。
