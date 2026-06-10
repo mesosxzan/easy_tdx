@@ -11,6 +11,8 @@ build/
 .venv/
 venv/
 .omc/
+.claude/
+.playwright-mcp/
 uv.lock
 docs/_build/
 FK/
