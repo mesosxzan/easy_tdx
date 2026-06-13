@@ -16,3 +16,7 @@ venv/
 uv.lock
 docs/_build/
 FK/
+
+# 测试覆盖率与运行时产物
+.coverage
+signals.json

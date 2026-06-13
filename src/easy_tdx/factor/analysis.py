@@ -56,6 +56,12 @@ class FactorAnalyzer:
                 ic_values.append(np.nan)
                 continue
             if method == "spearman":
+                try:
+                    import scipy  # type: ignore[import-untyped]  # noqa: F401  # pandas spearman lazy import
+                except ImportError as e:
+                    raise ImportError(
+                        "Rank IC (spearman) 需要 scipy，请执行 `pip install easy-tdx[science]`"
+                    ) from e
                 corr = valid[self._factor_col].corr(valid[self._return_col], method="spearman")
             else:
                 corr = valid[self._factor_col].corr(valid[self._return_col], method="pearson")

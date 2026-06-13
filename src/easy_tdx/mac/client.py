@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import asdict
 from types import TracebackType
@@ -47,6 +48,8 @@ from .models import (
 _RETRY_DELAYS = (0.1, 0.5, 1.0, 2.0)
 _KLINE_PAGE_SIZE = 700
 _BOARD_MEMBERS_PAGE_SIZE = 80
+
+_logger = logging.getLogger(__name__)
 
 
 def _convert_board_code(board_symbol: str) -> int:
@@ -815,6 +818,7 @@ class MacClient:
                     adjust=Adjust.NONE,
                 )
             except Exception:
+                _logger.debug("板块 %s K线获取失败，跳过", board_code, exc_info=True)
                 continue
 
             if kline_df.empty or len(kline_df) < 2:
@@ -1642,6 +1646,7 @@ class AsyncMacClient:
                     adjust=Adjust.NONE,
                 )
             except Exception:
+                _logger.debug("板块 %s K线获取失败，跳过", board_code, exc_info=True)
                 continue
 
             if kline_df.empty or len(kline_df) < 2:

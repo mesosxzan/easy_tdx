@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "easy-tdx"
-version = "1.11.1"
+version = "1.11.5"
 description = "通达信 TCP 协议行情数据客户端，支持在线行情、离线数据读取与写入同步"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,8 @@ dependencies = ["pandas>=2.0", "tzdata>=2024.1", "click>=8.0"]
 easy-tdx = "easy_tdx.cli:cli"  # cli/__init__.py exposes the click group
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov", "mypy>=1.9", "ruff>=0.4"]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.23", "pytest-cov", "mypy>=1.9", "ruff>=0.4", "scipy>=1.10"]
+science = ["scipy>=1.10"]
 web = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 
 [tool.hatch.build.targets.wheel]

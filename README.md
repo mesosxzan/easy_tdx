@@ -1511,6 +1511,24 @@ ruff format --check src/ tests/                              # format check
 
 ## Changelog
 
+### 1.11.5 (2026-06-13)
+
+**稳定性与代码质量修复** — 全项目代码审计 + 一个潜伏的 ping 崩溃 bug 修复。
+
+**Bug 修复**：
+- 修复 `easy-tdx ping` 在非交易时间（服务器握手阶段关闭连接）整个命令崩溃的问题。根因：`ping_host` 仅捕获 `OSError`，但握手期 `_recv_exact_sock` 抛出的 `TdxConnectionError`（继承自 `TdxError(Exception)` 而非 `OSError`）逃出捕获，经 `ping_all` 的 `fut.result()` 重新抛出，导致单台服务器不可用就拖垮整条测速命令。修复后符合 docstring 承诺"不可达服务器不包含在结果中"，并加防御层让 `ping_all` 对异常 future 容错跳过。
+- 修复回测 `OrderSimulator._find_bar_index` 把 DataFrame 的 index label 当位置索引用的隐患。当传入 df 的 index 非默认 RangeIndex 时，`idxmax()` 返回的 label 与 `iloc[]` 期望的位置不一致，可能导致撮合取错 K 线。改用 `to_numpy().argmax()` 取真实位置。
+
+**依赖与工程化**：
+- scipy 隐式硬依赖声明：`factor/analysis.py` 的 Rank IC（spearman）通过 pandas lazy import scipy，干净环境必报 `ModuleNotFoundError`。新增 `science` 可选依赖组（`pip install easy-tdx[science]`），并在 spearman 分支加 try-import 友好报错（复用 `optimizer.py` 现有模式）。
+- `mac/client.py` 板块 N 日涨跌幅排行中静默吞异常的 `except Exception: continue` 补上 `logger.debug` 日志，便于排查。
+- `.gitignore` 补全 `.coverage`、`signals.json`。
+
+**文档**：
+- `CLAUDE.md` 架构章节更新：补全 `mac/`、`ex/`、`unified.py`、`portfolio/`、`factor/`、`offline/`、`screen/` 等子包，说明四套 client（Windows/macOS/扩展/macOS扩展）的 sync+async 镜像关系。
+
+**测试**：564 passed, 0 failed（+8 新增：2 ping 容错回归、2 非连续 index 回归、4 既有覆盖增强）
+
 ### 1.11.1 (2026-06-12)
 
 **量化因子引擎 + 组合管理 + 高级回测增强** — 三大新模块，补齐从因子研究到组合执行的完整量化链路。

@@ -23,7 +23,18 @@ ruff format --check src/ tests/
 
 ```
 src/easy_tdx/
-├── client.py          # TdxClient / AsyncTdxClient（高层 API）
+├── client.py          # TdxClient / AsyncTdxClient（Windows 通达信协议高层 API）
+├── mac/               # macOS 通达信协议（独立命令/编解码/握手）
+│   ├── client.py      # MacClient / AsyncMacClient（mac 行情高层 API）
+│   ├── commands/      # mac 协议命令（SymbolQuotesCmd / BoardMembersQuotesCmd 等）
+│   ├── enums.py       # Category / SortType / FilterType / BoardType / Period / Adjust
+│   └── models.py      # MacQuoteField / MacTickChart 等 dataclass
+├── ex/                # 扩展行情协议（ExTdx）+ macOS 扩展（MacEx）
+│   ├── client.py      # ExTdxClient / AsyncExTdxClient
+│   ├── mac_client.py  # MacExClient / AsyncMacExClient（goods_* 系列方法）
+│   ├── commands/      # 扩展协议命令
+│   └── models.py      # ExMarketInfo / ExInstrumentInfo 等
+├── unified.py         # UnifiedTdxClient / AsyncUnifiedTdxClient（聚合 mac + mac_ex 的门面）
 ├── chanlun/           # 缠论技术分析模块（独立于 transport，纯计算）
 │   ├── analyser.py    # ChanlunAnalyser 主入口（接收 DataFrame）
 │   ├── types.py       # 数据结构（Kline/CLKline/FX/BI/XD/ZS/MMD/BC）
@@ -39,27 +50,41 @@ src/easy_tdx/
 │   ├── beichi.py      # 背驰判断（笔/盘整/趋势）
 │   └── multi_level.py # 多级别联立分析
 ├── transport/
-│   ├── sync.py        # TdxConnection（socket）+ ping_host / ping_all
+│   ├── sync.py        # TdxConnection（socket）+ ping_host / ping_all / ping_mac_all
 │   └── async_.py      # AsyncTdxConnection（asyncio）
 ├── commands/          # 每条命令：build_request() + parse_response()，无 IO
-├── codec/             # price / volume / datetime / frame 编解码
+├── codec/             # price / volume / datetime / frame / financial / bitmap 编解码
 ├── backtest/          # 回测引擎
 │   ├── engine.py      # BacktestEngine（止损/止盈执行/缠论自动桥接）
 │   ├── strategy.py    # Strategy 基类（向量化 datetime）
 │   ├── orders.py      # OrderSimulator（SL/TP 同 bar 执行）
+│   ├── execution.py   # 可插拔执行模型（Immediate/TWAP/VWAP/Limit）
+│   ├── slippage.py    # 滑点模型（Fixed/Percent/Volume/Volatility）
 │   ├── performance.py # PerformanceAnalyzer（FIFO 真实持仓天数）
-│   ├── portfolio_engine.py # 多标的组合回测
-│   └── combo.py       # 多因子组合回测
+│   ├── portfolio.py / portfolio_engine.py # 多标的组合回测
+│   ├── combo.py       # 多因子组合回测
+│   ├── attribution.py # Brinson / 因子 / 成本归因
+│   └── dsl.py         # 策略 DSL 解析
+├── portfolio/         # 组合层
+│   ├── optimizer.py   # 权重优化（mean_variance 可选 scipy，缺失回退等权）
+│   └── ...            # risk / rebalance 等
+├── factor/            # 因子分析
+│   ├── analysis.py    # FactorAnalyzer（compute_ic 用 spearman，可选 scipy → pip install easy-tdx[science]）
+│   ├── engine.py / base.py / transform.py
+│   └── builtin/       # 内置因子
 ├── screen/
-│   └── scanner.py     # SignalScanner（并发扫描/增量缓存）
+│   ├── scanner.py     # SignalScanner（并发扫描/增量缓存）
+│   └── ranker.py      # 排序/打分
 ├── realtime/
 │   └── engine.py      # EventBus + RealtimeStrategy（asyncio 事件驱动）
-├── cli/
-│   └── cmd_chanlun.py # easy-tdx chanlun CLI 命令
+├── offline/           # 离线数据读写（daily_bar / min_bar / gbbq / history_financial 等）
+├── indicator.py / MyTT.py  # 技术指标（MyTT 为第三方库移植，命名沿袭惯例）
+├── config.py          # 主机/端口/超时配置 + best_host 持久化
+├── cli/               # easy-tdx CLI（click）；cmd_chanlun / cmd_backtest / cmd_offline / cmd_factor 等
 └── models/            # 纯 dataclass，无业务逻辑
 ```
 
-commands 层不依赖 transport，可独立单测。修改 codec 或 commands 时不需要网络。
+四套 client 关系：`client.py`（Windows 标准）、`mac/client.py`（macOS）、`ex/client.py`（扩展）、`ex/mac_client.py`（macOS 扩展）；每套均提供 sync + async 镜像。`unified.py` 是 mac + mac_ex 的门面。commands 层不依赖 transport，可独立单测。修改 codec 或 commands 时不需要网络。
 
 ## 协议编解码注意事项
 
