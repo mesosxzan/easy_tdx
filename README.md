@@ -1511,6 +1511,21 @@ ruff format --check src/ tests/                              # format check
 
 ## Changelog
 
+### 1.11.6 (2026-06-13)
+
+**CI 类型与格式修复** — 修复 CI 流水线 mypy strict（13 errors）和 ruff format（8 files）失败，全部为类型标注与存根问题，无运行时行为变更。
+
+**mypy strict 修复（13 errors → 0）**：
+- `portfolio/optimizer.py`：`register_optimizer` 装饰器返回类型从 `type[WeightOptimizer]` 改为 `Callable[[type[WeightOptimizer]], type[WeightOptimizer]]`，消除 4 个子类 "Too many arguments" 误报
+- `factor/engine.py`：`_datetime_to_int` 用 `isinstance` 收窄替代 `object → int` 强转，消除 call-overload + no-any-return
+- `backtest/orders.py` / `execution.py`：年化波动率 `np.sqrt()` 表达式用 `float()` 包裹，消除 no-any-return
+- `factor/builtin/technical.py`：`MyTT.pyi` 的 `MACD` 存根删除错误的 `LOW/HIGH` 参数，与 `MyTT.py` 实际签名 `MACD(CLOSE, SHORT, LONG, M)` 对齐
+- `pyproject.toml`：新增 scipy mypy override（`ignore_missing_imports`），统一处理可选依赖的 stubs 缺失，移除冗余 inline `type: ignore`
+
+**ruff format**：8 个 test 文件统一格式化。
+
+**测试**：564 passed, 0 failed；mypy 192 文件零错误；ruff check/format 全绿。
+
 ### 1.11.5 (2026-06-13)
 
 **稳定性与代码质量修复** — 全项目代码审计 + 一个潜伏的 ping 崩溃 bug 修复。
