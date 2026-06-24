@@ -191,6 +191,8 @@ class SignalRanker:
 
         仅对排名中的股票查询，通常只有几十只。
 
+        分批查询（每批最多 80 只），避免超出 MAC 协议单次报价上限导致末尾名字丢失。
+
         Args:
             entries: 排名列表
 
@@ -210,7 +212,14 @@ class SignalRanker:
             client = MacClient.from_best_host()
             try:
                 client.connect()
-                quotes_df = client.get_stock_quotes(pairs)
+                # 分批查询：MAC 协议单次最多 80 只，超出部分会被服务器丢弃
+                import pandas as pd
+
+                frames: list[pd.DataFrame] = []
+                for i in range(0, len(pairs), 80):
+                    batch = pairs[i : i + 80]
+                    frames.append(client.get_stock_quotes(batch))
+                quotes_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
             finally:
                 client.close()
 

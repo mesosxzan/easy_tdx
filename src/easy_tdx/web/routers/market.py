@@ -98,3 +98,71 @@ async def history_fund_flow(
     """获取个股历史日线资金流向。"""
     df = await client.get_history_fund_flow(market_from_str(market), code, start, count)
     return _df_response(df)
+
+
+@router.get("/market/strength", response_model=DataFrameResponse)
+async def market_strength(
+    preset: str = Query(
+        "steady",
+        description="预设模式: steady(中长期稳健) / breakout(近期妖股) / balanced(均衡)",
+    ),
+    w5: float | None = Query(None, description="自定义 5 日权重（覆盖预设）"),
+    w20: float | None = Query(None, description="自定义 20 日权重（覆盖预设）"),
+    w60: float | None = Query(None, description="自定义 60 日权重（覆盖预设）"),
+    vol_adjusted: bool | None = Query(None, description="波动率惩罚开关（覆盖预设）"),
+    top_n: int = Query(50, ge=1, le=5000, description="返回前 N 名"),
+    universe: str = Query("all", description="范围: all/sh/sz"),
+    min_listed_days: int = Query(65, ge=30, description="最小上市天数"),
+    min_amount: float = Query(0.0, ge=0, description="最近 5 日日均成交额下限（元）"),
+    vipdoc: str | None = Query(None, description="离线数据目录（默认自动检测）"),
+) -> DataFrameResponse:
+    """全市场强势股排名（基于本地通达信 .day 日线文件）。
+
+    按 5/20/60 日涨幅加权合成强势分。三种预设：
+
+    - **steady**: 中长期稳健（60日主导 + 波动率惩罚），选出稳着涨的票
+    - **breakout**: 近期妖股爆发（5日主导，纯涨幅），选出短期最猛的票
+    - **balanced**: 三周期均衡 + 波动率调整
+
+    注意：需要本地 vipdoc 数据，扫描 ~5000 只约 30-60 秒。
+    """
+    import asyncio
+
+    from easy_tdx.screen.strength import StrengthRanker
+
+    ranker = StrengthRanker(
+        vipdoc_path=vipdoc,
+        preset=preset,
+        w5=w5,
+        w20=w20,
+        w60=w60,
+        vol_adjusted=vol_adjusted,
+        min_listed_days=min_listed_days,
+        min_amount=min_amount,
+    )
+
+    # Web 端用线程池执行，避免阻塞事件循环（扫描全市场耗时较长）
+    # 注：在协程内用 get_running_loop() 而非 get_event_loop()，
+    # 后者在 Python 3.12+ 已弃用。
+    loop = asyncio.get_running_loop()
+    results = await loop.run_in_executor(
+        None, lambda: ranker.rank(universe=universe, top_n=top_n)
+    )
+
+    records = [
+        {
+            "rank": r.rank,
+            "code": r.code,
+            "market": r.market,
+            "name": r.name,
+            "last_close": r.last_close,
+            "last_date": r.last_date,
+            "ret_5": r.ret_5,
+            "ret_20": r.ret_20,
+            "ret_60": r.ret_60,
+            "vol_20": r.vol_20,
+            "strength": r.strength,
+        }
+        for r in results
+    ]
+    return DataFrameResponse(data=records, count=len(records))

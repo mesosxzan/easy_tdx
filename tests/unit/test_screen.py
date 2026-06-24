@@ -342,6 +342,49 @@ class TestScanOne:
         assert _detect_security_type("sz399001.day") == "SZ_INDEX"
         assert _detect_security_type("sz159919.day") == "SZ_FUND"
 
+    def test_detect_security_type_etf_and_funds(self) -> None:
+        """ETF / 基金 / 科创板 / 国债逆回购不应被误判为 A 股。
+
+        回归测试：修复前 sh588710/sh562590/sz184801/sh204001 等被
+        _detect_security_type 默认返回值误判为 SZ_A_STOCK。
+        """
+        from easy_tdx.offline.daily_bar import _detect_security_type
+
+        # ── 真 A 股（必须正确识别）──
+        assert _detect_security_type("sh600000.day") == "SH_A_STOCK"
+        assert _detect_security_type("sh601869.day") == "SH_A_STOCK"  # 长飞光纤
+        assert _detect_security_type("sh688146.day") == "SH_A_STOCK"  # 科创板
+        assert _detect_security_type("sz000001.day") == "SZ_A_STOCK"
+        assert _detect_security_type("sz300489.day") == "SZ_A_STOCK"  # 创业板
+
+        # ── 上交所 ETF / LOF / 货币基金（曾经误判为 SZ_A_STOCK）──
+        assert _detect_security_type("sh588710.day") == "SH_FUND"  # 科创板ETF
+        assert _detect_security_type("sh588000.day") == "SH_FUND"
+        assert _detect_security_type("sh589000.day") == "SH_FUND"  # 科创板行业ETF
+        assert _detect_security_type("sh562590.day") == "SH_FUND"  # 科创板LOF
+        assert _detect_security_type("sh563000.day") == "SH_FUND"
+        assert _detect_security_type("sh520500.day") == "SH_FUND"  # ETF
+        assert _detect_security_type("sh530000.day") == "SH_FUND"
+        assert _detect_security_type("sh551000.day") == "SH_FUND"  # 货币ETF
+        assert _detect_security_type("sh501000.day") == "SH_FUND"  # LOF
+        assert _detect_security_type("sh510300.day") == "SH_FUND"  # 沪深300ETF
+
+        # ── 深交所封闭式基金 / LOF（sz184801 曾误判为 SZ_A_STOCK）──
+        assert _detect_security_type("sz184801.day") == "SZ_FUND"
+        assert _detect_security_type("sz150200.day") == "SZ_FUND"  # 分级基金
+        assert _detect_security_type("sz161725.day") == "SZ_FUND"  # LOF
+
+        # ── 国债逆回购（债券类）──
+        assert _detect_security_type("sh204001.day") == "SH_BOND"  # GC001
+
+        # ── 指数 ──
+        assert _detect_security_type("sh000001.day") == "SH_INDEX"  # 上证综指
+        assert _detect_security_type("sz399001.day") == "SZ_INDEX"  # 深证成指
+
+        # ── 未知代码段不应被默认成 A 股 ──
+        assert _detect_security_type("sh777777.day") == "UNKNOWN"
+        assert _detect_security_type("sz777777.day") == "UNKNOWN"
+
 
 # ── 策略加载测试 ────────────────────────────────────────────────────────
 
@@ -382,3 +425,274 @@ class DummyStrategy(Strategy):
 
         with pytest.raises(SystemExit):
             _load_strategy(str(filepath))
+
+
+# ── 强势股排名测试 ──────────────────────────────────────────────────────
+
+
+class TestStrengthPresets:
+    """测试预设模式配置。"""
+
+    def test_preset_keys(self) -> None:
+        from easy_tdx.screen.strength import STRENGTH_PRESETS
+
+        assert set(STRENGTH_PRESETS.keys()) == {"steady", "breakout", "balanced"}
+
+    def test_steady_config(self) -> None:
+        from easy_tdx.screen.strength import STRENGTH_PRESETS
+
+        cfg = STRENGTH_PRESETS["steady"]
+        assert cfg["w60"] > cfg["w5"]  # 60 日主导
+        assert cfg["vol_adjusted"] is True
+
+    def test_breakout_config(self) -> None:
+        from easy_tdx.screen.strength import STRENGTH_PRESETS
+
+        cfg = STRENGTH_PRESETS["breakout"]
+        assert cfg["w5"] > cfg["w60"]  # 5 日主导
+        assert cfg["vol_adjusted"] is False  # 妖股不惩罚波动
+
+    def test_balanced_config(self) -> None:
+        from easy_tdx.screen.strength import STRENGTH_PRESETS
+
+        cfg = STRENGTH_PRESETS["balanced"]
+        # 三周期接近等权
+        assert abs(cfg["w5"] - cfg["w20"]) < 0.05
+        assert abs(cfg["w20"] - cfg["w60"]) < 0.05
+        assert cfg["vol_adjusted"] is True
+
+    def test_all_presets_have_desc(self) -> None:
+        from easy_tdx.screen.strength import STRENGTH_PRESETS
+
+        for name, cfg in STRENGTH_PRESETS.items():
+            assert "desc" in cfg, f"预设 {name} 缺少 desc"
+            assert isinstance(cfg["desc"], str) and len(cfg["desc"]) > 0
+
+
+class TestComputeStrengthMetrics:
+    """测试纯计算函数 compute_strength_metrics。"""
+
+    def test_data_too_short(self) -> None:
+        """少于 65 根 K 线返回 None。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([10.0 + i * 0.1 for i in range(30)])
+        assert compute_strength_metrics(closes, 0.3, 0.3, 0.4, True) is None
+
+    def test_steady_uptrend(self) -> None:
+        """稳定上涨的票，steady 模式应有正分。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([10.0 + i * 0.05 for i in range(70)])  # 稳定上涨
+        m = compute_strength_metrics(closes, 0.2, 0.3, 0.5, True)
+        assert m is not None
+        assert m["ret_5"] > 0
+        assert m["ret_20"] > 0
+        assert m["ret_60"] > 0
+        assert m["strength"] > 0
+
+    def test_weight_normalization(self) -> None:
+        """权重应自动归一化（同比例权重结果相同）。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([10.0 + i * 0.1 for i in range(70)])
+        m1 = compute_strength_metrics(closes, 0.3, 0.3, 0.4, False)
+        m2 = compute_strength_metrics(closes, 3.0, 3.0, 4.0, False)  # 10 倍
+        assert m1 is not None and m2 is not None
+        assert abs(m1["strength"] - m2["strength"]) < 1e-10
+
+    def test_vol_adjusted_differences(self) -> None:
+        """vol_adjusted True/False 应给出不同分。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([10.0 + i * 0.1 for i in range(70)])
+        m_raw = compute_strength_metrics(closes, 0.3, 0.3, 0.4, False)
+        m_adj = compute_strength_metrics(closes, 0.3, 0.3, 0.4, True)
+        assert m_raw is not None and m_adj is not None
+        assert m_raw["strength"] != m_adj["strength"]
+        # 调整后 = 原始 / vol，vol < 1 时调整后更大
+        assert m_adj["strength"] > m_raw["strength"]
+
+    def test_flat_price_zero_vol(self) -> None:
+        """价格不变时 vol=0，应返回 None。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([10.0] * 70)
+        assert compute_strength_metrics(closes, 0.3, 0.3, 0.4, True) is None
+
+    def test_downtrend_negative_strength(self) -> None:
+        """下跌趋势的票应有负分。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([20.0 - i * 0.05 for i in range(70)])  # 稳定下跌
+        m = compute_strength_metrics(closes, 0.3, 0.3, 0.4, False)
+        assert m is not None
+        assert m["ret_5"] < 0
+        assert m["strength"] < 0
+
+    def test_all_weights_zero(self) -> None:
+        """权重全为 0 返回 None。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([10.0 + i * 0.1 for i in range(70)])
+        assert compute_strength_metrics(closes, 0.0, 0.0, 0.0, True) is None
+
+    def test_metrics_keys(self) -> None:
+        """返回的字典应包含所有字段。"""
+        from easy_tdx.screen.strength import compute_strength_metrics
+
+        closes = pd.Series([10.0 + i * 0.1 for i in range(70)])
+        m = compute_strength_metrics(closes, 0.3, 0.3, 0.4, True)
+        assert m is not None
+        assert set(m.keys()) == {
+            "ret_5",
+            "ret_20",
+            "ret_60",
+            "vol_20",
+            "strength",
+        }
+
+
+class TestStrengthResult:
+    """测试 StrengthResult 数据结构。"""
+
+    def test_creation(self) -> None:
+        from easy_tdx.screen.strength import StrengthResult
+
+        r = StrengthResult(code="000001", market="SZ", strength=1.5)
+        assert r.code == "000001"
+        assert r.market == "SZ"
+        assert r.rank == 0  # 默认
+        assert r.strength == 1.5
+
+    def test_full_creation(self) -> None:
+        from easy_tdx.screen.strength import StrengthResult
+
+        r = StrengthResult(
+            rank=1,
+            code="600519",
+            market="SH",
+            name="贵州茅台",
+            last_close=1800.0,
+            last_date=20260624,
+            ret_5=0.05,
+            ret_20=0.12,
+            ret_60=0.25,
+            vol_20=0.015,
+            strength=8.5,
+        )
+        assert r.rank == 1
+        assert r.name == "贵州茅台"
+        assert r.last_date == 20260624
+
+
+class TestStrengthRankerOutput:
+    """测试 StrengthRanker 的 JSON/表格输出（不触及文件 IO）。"""
+
+    def _make_results(self) -> list[Any]:
+        from easy_tdx.screen.strength import StrengthResult
+
+        return [
+            StrengthResult(
+                rank=1,
+                code="000001",
+                market="SZ",
+                name="平安银行",
+                last_close=12.5,
+                last_date=20260624,
+                ret_5=0.08,
+                ret_20=0.15,
+                ret_60=0.30,
+                vol_20=0.018,
+                strength=9.5,
+            ),
+            StrengthResult(
+                rank=2,
+                code="600519",
+                market="SH",
+                name="",
+                last_close=1800.0,
+                last_date=20260624,
+                ret_5=0.03,
+                ret_20=0.05,
+                ret_60=0.10,
+                vol_20=0.012,
+                strength=6.2,
+            ),
+        ]
+
+    def test_to_json(self) -> None:
+        from easy_tdx.screen.strength import StrengthRanker
+
+        results = self._make_results()
+        json_str = StrengthRanker.to_json(results, "steady", 20260624)
+        data = json.loads(json_str)
+
+        assert data["preset"] == "steady"
+        assert "preset_desc" in data
+        assert data["data_date"] == 20260624
+        assert data["total_ranked"] == 2
+        assert data["ranking"][0]["rank"] == 1
+        assert data["ranking"][0]["code"] == "000001"
+        assert data["ranking"][1]["code"] == "600519"
+
+    def test_to_table(self) -> None:
+        from easy_tdx.screen.strength import StrengthRanker
+
+        results = self._make_results()
+        table = StrengthRanker.to_table(results, "breakout", 20260624)
+
+        assert "强势股排名" in table
+        assert "breakout" in table
+        assert "数据截止: 2026-06-24" in table
+        assert "SZ000001" in table
+        assert "平安银行" in table
+
+    def test_to_table_empty(self) -> None:
+        from easy_tdx.screen.strength import StrengthRanker
+
+        table = StrengthRanker.to_table([], "steady", 20260624)
+        assert "无有效排名结果" in table
+
+    def test_to_json_includes_all_metrics(self) -> None:
+        from easy_tdx.screen.strength import StrengthRanker
+
+        results = self._make_results()
+        json_str = StrengthRanker.to_json(results, "balanced", 20260624)
+        data = json.loads(json_str)
+
+        entry = data["ranking"][0]
+        for key in ("ret_5", "ret_20", "ret_60", "vol_20", "strength", "last_close", "last_date"):
+            assert key in entry, f"排名条目缺少字段 {key}"
+
+
+class TestStrengthRankerInit:
+    """测试 StrengthRanker 初始化（不触及文件 IO）。"""
+
+    def test_invalid_preset_raises(self) -> None:
+        from easy_tdx.screen.strength import StrengthRanker
+
+        # resolve_vipdoc 在 __init__ 中调用，需要 mock 掉
+        with patch("easy_tdx.screen.strength.resolve_vipdoc", return_value=Path("/fake")):
+            with pytest.raises(ValueError, match="未知预设"):
+                StrengthRanker(preset="invalid")
+
+    def test_custom_weights_override_preset(self) -> None:
+        from easy_tdx.screen.strength import StrengthRanker
+
+        with patch("easy_tdx.screen.strength.resolve_vipdoc", return_value=Path("/fake")):
+            ranker = StrengthRanker(
+                preset="steady", w5=0.5, w20=0.3, w60=0.2, vol_adjusted=False
+            )
+        assert ranker._w5 == 0.5
+        assert ranker._w20 == 0.3
+        assert ranker._w60 == 0.2
+        assert ranker._vol_adjusted is False
+
+    def test_preset_property(self) -> None:
+        from easy_tdx.screen.strength import StrengthRanker
+
+        with patch("easy_tdx.screen.strength.resolve_vipdoc", return_value=Path("/fake")):
+            ranker = StrengthRanker(preset="breakout")
+        assert ranker.preset == "breakout"
+

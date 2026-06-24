@@ -3,11 +3,13 @@
 子命令：
     scan — 纯离线扫描信号
     rank — 回测排名
+    strength — 全市场强势股排名（5/20/60 日涨幅加权）
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -217,6 +219,174 @@ def rank_cmd(
         click.echo(ranker.to_table(entries, sort_by))
     else:
         click.echo(ranker.to_json(entries, strategy_name, sort_by))
+
+
+# ── strength 子命令 ──────────────────────────────────────────────────────────
+
+
+@screen.command("strength")
+@click.option(
+    "--preset",
+    default="steady",
+    type=click.Choice(["steady", "breakout", "balanced"]),
+    help="预设模式: steady(中长期稳健,默认) / breakout(近期妖股) / balanced(均衡)",
+)
+@click.option("--w5", default=None, type=float, help="自定义 5 日权重（覆盖预设）")
+@click.option("--w20", default=None, type=float, help="自定义 20 日权重（覆盖预设）")
+@click.option("--w60", default=None, type=float, help="自定义 60 日权重（覆盖预设）")
+@click.option(
+    "--vol-adjusted/--no-vol-adjusted",
+    default=None,
+    help="是否波动率惩罚（覆盖预设）",
+)
+@click.option("--top", "top_n", default=50, type=int, help="返回前 N 名（默认 50）")
+@click.option("--universe", default="all", help="范围: all/sh/sz/<文件路径>")
+@click.option("--vipdoc", default=None, help="离线数据目录（默认自动检测）")
+@click.option("--min-listed-days", default=65, type=int, help="最小上市天数（默认 65）")
+@click.option(
+    "--min-amount",
+    default=0.0,
+    type=float,
+    help="最近 5 日日均成交额下限（元，默认不过滤）",
+)
+@click.option(
+    "--workers",
+    default=0,
+    type=int,
+    help="并发进程数: 0=串行（默认），4-8 推荐",
+)
+@click.option("--output", "output_file", default=None, help="输出 JSON 文件（默认 stdout）")
+@click.option("--table", "use_table", is_flag=True, help="表格输出")
+@click.option("--names/--no-names", default=False, help="在线查询股票名称（默认关闭）")
+def strength_cmd(
+    preset: str,
+    w5: float | None,
+    w20: float | None,
+    w60: float | None,
+    vol_adjusted: bool | None,
+    top_n: int,
+    universe: str,
+    vipdoc: str | None,
+    min_listed_days: int,
+    min_amount: float,
+    workers: int,
+    output_file: str | None,
+    use_table: bool,
+    names: bool,
+) -> None:
+    """全市场强势股排名 — 按 5/20/60 日涨幅加权排序。
+
+    三种预设：
+
+      steady   — 中长期稳健（60日主导 + 波动率惩罚），选稳着涨的票
+
+      breakout — 近期妖股爆发（5日主导，纯涨幅），选最猛的票
+
+      balanced — 三周期均衡 + 波动率调整
+
+    示例：
+
+      easy-tdx screen strength --preset steady --top 50 --table
+
+      easy-tdx screen strength --preset breakout --top 20 --names --table
+
+      easy-tdx screen strength --w5 0.5 --w20 0.3 --w60 0.2 --top 30
+    """
+    from .strength import StrengthRanker
+
+    click.echo(f"模式: {preset}", err=True)
+    click.echo(f"范围: {universe} | Top: {top_n}", err=True)
+    if workers > 0:
+        click.echo(f"并发: {workers} 进程", err=True)
+
+    ranker = StrengthRanker(
+        vipdoc_path=vipdoc,
+        preset=preset,
+        w5=w5,
+        w20=w20,
+        w60=w60,
+        vol_adjusted=vol_adjusted,
+        min_listed_days=min_listed_days,
+        min_amount=min_amount,
+    )
+
+    def on_progress(current: int, total: int, name: str) -> None:
+        if name == "done":
+            click.echo(f"\r扫描完成: {total} 只", err=True)
+        else:
+            pct = current * 100 // total if total > 0 else 0
+            click.echo(f"\r[{current}/{total}] {pct}% {name}", nl=False, err=True)
+
+    results = ranker.rank(
+        universe=universe,
+        top_n=top_n,
+        workers=workers,
+        progress_callback=on_progress,
+    )
+
+    # 数据截止日期（取排名第一的 last_date）
+    data_date = results[0].last_date if results else 0
+
+    # 可选补齐名称
+    if names and results:
+        click.echo("\n获取股票名称...", err=True)
+        results = _enrich_strength_names(results)
+
+    if use_table:
+        click.echo(ranker.to_table(results, preset, data_date))
+    else:
+        json_str = ranker.to_json(results, preset, data_date)
+        if output_file:
+            Path(output_file).write_text(json_str, encoding="utf-8")
+            click.echo(f"排名: {len(results)} 只 → {output_file}")
+        else:
+            click.echo(json_str)
+
+
+def _enrich_strength_names(
+    results: list[Any],
+) -> list[Any]:
+    """在线查询补齐股票名称（复用 ranker 的逻辑）。
+
+    分批查询（每批最多 80 只），避免超出 MAC 协议单次报价上限导致末尾名字丢失。
+    """
+    try:
+        from easy_tdx.cli.parsers import parse_market
+        from easy_tdx.mac.client import MacClient
+
+        pairs = [(parse_market(r.market), r.code) for r in results]
+        client = MacClient.from_best_host()
+        try:
+            client.connect()
+            # 分批查询：MAC 协议单次最多 80 只，超出部分会被服务器丢弃
+            import pandas as pd
+
+            frames: list[pd.DataFrame] = []
+            for i in range(0, len(pairs), 80):
+                batch = pairs[i : i + 80]
+                frames.append(client.get_stock_quotes(batch))
+            quotes_df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+        finally:
+            client.close()
+
+        if quotes_df.empty or "name" not in quotes_df.columns:
+            return results
+
+        _market_map = {0: "SZ", 1: "SH"}
+        name_map: dict[str, str] = {}
+        for _, row in quotes_df.iterrows():
+            mkt_int = row.get("market", -1)
+            mkt_str = _market_map.get(mkt_int, str(mkt_int))
+            key = f"{mkt_str}{row.get('code', '')}"
+            name_map[key] = str(row.get("name", ""))
+
+        for r in results:
+            r.name = name_map.get(f"{r.market}{r.code}", "")
+    except Exception:
+        # 名称查询失败不影响主流程
+        pass
+
+    return results
 
 
 # ── 辅助函数 ──────────────────────────────────────────────────────────────────

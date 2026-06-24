@@ -30,6 +30,9 @@ def _detect_security_type(filename: str) -> str:
     """从文件名推断证券类型。
 
     文件名格式: {exchange}{code}.day，如 sh600000.day、sz000001.day
+
+    依据上交所/深交所《证券代码段分配指南》判定。无法识别的代码段
+    返回 "UNKNOWN"（而非默认深市 A 股），避免把基金/ETF/债券误判为股票。
     """
     base = Path(filename).name.lower()
     exchange = base[:2]  # "sh" or "sz"
@@ -44,21 +47,29 @@ def _detect_security_type(filename: str) -> str:
             return "SZ_INDEX"
         if code_head in ("15", "16"):
             return "SZ_FUND"
+        if code_head in ("17", "18"):  # 封闭式基金 / LOF / ETF
+            return "SZ_FUND"
         if code_head in ("10", "11", "12", "13", "14"):
             return "SZ_BOND"
     elif exchange == "sh":
         if code_head == "60":
             return "SH_A_STOCK"
+        if code_head == "68":  # 科创板（688 开头）
+            return "SH_A_STOCK"
         if code_head == "90":
             return "SH_B_STOCK"
         if code_head in ("00", "88", "99"):
             return "SH_INDEX"
-        if code_head in ("50", "51"):
+        if code_head in ("50", "51", "52", "53", "55", "56", "58"):
+            # 501 LOF / 510-519 ETF / 520-529 ETF / 530-539 ETF
+            # 550-556 货币ETF / 560-563 LOF / 588-589 科创板ETF
             return "SH_FUND"
         if code_head in ("01", "10", "11", "12", "13", "14"):
             return "SH_BOND"
+        if code_head == "20":  # 国债逆回购（204xxx）
+            return "SH_BOND"
 
-    return "SZ_A_STOCK"  # 默认按 A 股处理
+    return "UNKNOWN"
 
 
 def read_daily_bars(filepath: str | Path) -> list[SecurityBar]:
