@@ -2,14 +2,14 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
-## [Unreleased]
+## [1.15.1] — 2026-06-27
 
 ### 新增
 
 - **通达信原生 F10 与财务快照 CLI 命令** — 把 `TdxClient` 上已封装但未暴露给 CLI 的三个方法做成命令，数据源与 Web 层 `/finance` `/company/*` 端点同源，覆盖 `f10`（新浪三表）之外的 F10 全文板块。
   - 新增 `easy-tdx finance-info` — 最新财务快照（37 字段：股本结构、资产负债、利润、现金流、每股指标），与 `f10`（多期三表）互补。
   - 新增 `easy-tdx company-info` — F10 板块目录，列出最新提示/公司概况/财务分析/股东研究/股本结构/资本运作/业内点评/行业分析/公司大事/研究报告/经营分析/主力追踪/分红扩股/高层治理/龙虎榜单/关联个股等板块及其文件偏移。
-  - 新增 `easy-tdx company-info-content` — 读取 F10 板块正文，`name_or_filename` 既可传板块名（自动定位到该板块起点读取），也可直接传文件名；`--offset` / `--length` 控制读取范围。
+  - 新增 `easy-tdx company-info-content` — 读取 F10 板块正文，`name_or_filename` 既可传板块名（自动定位到该板块起点读取），也可直接传文件名；`--offset` 语义随入参而定（板块名=板块内相对偏移，文件名=文件绝对偏移），`--length` 控制读取范围。
   - 新增 `get_tdx_client()` 上下文管理器（`cli/conn.py`），仿 `get_mac_client()` 包装 `TdxClient.from_best_host()`。
 
 ## [1.15.0] — 2026-06-25
