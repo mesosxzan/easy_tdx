@@ -72,7 +72,10 @@ class TickChartsCmd(BaseCommand[MacMultiTickChart]):
                 )
                 ticks.append(
                     MacTick(
-                        time=time(minutes // 60, minutes % 60),
+                        # 多日分时里 minutes 在个别服务器/数据状态下可能 ≥ 1440
+                        # （累计或异常值），对 24 取模折算成日内时刻，避免 ValueError。
+                        # 与单日分时 SymbolTickChartCmd 的处理保持一致（Issue #10）。
+                        time=time(minutes // 60 % 24, minutes % 60),
                         price=price,
                         avg=avg,
                         vol=vol,

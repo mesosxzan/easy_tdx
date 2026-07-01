@@ -2,6 +2,17 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.16.1] — 2026-07-01
+
+### 修复
+
+- **多日分时图 `tick --days N` 命令因 `minutes ≥ 1440` 报 `ValueError: hour must be in 0..23`**（`mac/commands/tick_charts.py`，[Issue #10](https://github.com/handsomejustin/easy_tdx/issues/10)）— 执行 `easy-tdx tick SH 600519 --days 5` 时崩溃。多日分时图（MAC 协议 `0x123E`）解析 `time(minutes // 60, minutes % 60)` 缺少对 24 取模的保护，当个别服务器 / 数据状态下返回的 `minutes` 值 ≥ 1440（累计或异常值，用户实测出现 `minutes ≈ 62340` 即 `// 60 == 1039`）时，`minutes // 60` 超过 23 触发 `ValueError`。
+  - 修复：改为 `time(minutes // 60 % 24, minutes % 60)`，与单日分时 `SymbolTickChartCmd` 的处理**完全一致**。
+  - 语义自洽：每条 tick 的**日期**取自 `date_ints[d]`（与 `minutes` 无关），`minutes` 字段只承载「日内时刻」，`% 24` 折算成日内时刻是正确的降级。
+  - **对正常数据零行为改变**：抓取多只股票 × {2 天, 5 天} 真实响应逐条对比，新公式与旧公式产出 `time` 对象**完全相同**（`new_vs_old_diffs=0`），所有时刻落在 09–15 交易时段。
+  - 对异常 `minutes` 值，无法仅凭该字段恢复真正时刻（需日边界信息），故产出合法占位时刻，避免崩溃、不污染日期列。
+  - 新增 3 个单元测试（`test_mac_tick_charts.py`：正常分钟 / Issue #10 回归用报错现场原值 62340 / 请求包布局），全量 703 单测通过。
+
 ## [1.16.0] — 2026-06-30
 
 ### 新增
