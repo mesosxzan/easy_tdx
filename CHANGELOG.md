@@ -2,6 +2,15 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.16.3] — 2026-07-02
+
+### 修复
+
+- **`market-stat` 全市场涨跌统计家数系统性偏小 10 倍**（`client.py`，同步 + 异步 `get_market_stat()`）— 实测 `easy-tdx market-stat` 返回 `up_count=322 / down_count=214 / total_count=553 / limit_up_count=13 / limit_down_count=0`，量级明显不符全 A 股（5000+ 只）。根因：通达信"统计指数"`880005`（涨跌统计）/ `880006`（涨跌停统计）的计数类字段返回的是**真实家数的 1/10**，旧实现直接 `int(q.price)` 当家数用，未做缩放还原。
+  - 修复：对 6 个计数字段（涨 / 跌 / 平 / 总数 / 涨停 / 跌停）统一 `round(field * 10)` 还原；`total_amount` / `total_volume` / `total_market_cap` 不受此协议缩放影响，保持原样透传。
+  - 验证：实抓 `up=3225 / down=2148 / neutral=144 / total=5530`，`3225+2148+144+13(suspended)=5530` 计数守恒；`limit_up=131 / limit_down=6` 量级回归正常。同步 + 异步路径一致修复。
+  - 重写 `test_get_market_stat_mapping`：用真实协议值（还原前家数 / 10）构造 mock，断言 ×10 还原后的真实家数，并补齐此前未覆盖的 `limit_up_count` / `limit_down_count` / `suspended_count` / `total_amount` / `total_volume` / `total_market_cap` 断言。
+
 ## [1.16.2] — 2026-07-02
 
 **质量加固版本** —— 经三轮代码审计（B 6.9 → A 7.6 → A 7.9）后的综合修复，覆盖协议核心层、数据正确性、错误处理、测试真实度与可维护性。**761 单测全绿**（+58），`ruff check` / `ruff format --check` / `mypy strict` 全部通过，CI 加 Windows 矩阵 + trusted publishing + 签名，达到稳定 PyPI 库发布质量。

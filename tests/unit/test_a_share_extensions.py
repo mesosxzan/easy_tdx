@@ -102,61 +102,69 @@ def test_get_security_list_all_filtering(_mock_conn_cls):
 
 @patch("easy_tdx.client.TdxConnection")
 def test_get_market_stat_mapping(_mock_conn_cls):
-    """测试市场统计字段映射。"""
+    """测试市场统计字段映射。
+
+    通达信统计指数的计数字段返回真实家数的 1/10，get_market_stat 内部需 ×10 还原。
+    这里构造的原始协议值是还原后家数的 1/10，断言还原后等于真实家数。
+    """
     client = TdxClient("127.0.0.1")
 
-    mock_quote = SecurityQuote(
-        Market.SH,
+    def _zero_quote(code, **kw):
+        """构造一只仅关键字段非零的 SecurityQuote，其余五档/活跃度字段取默认 0。"""
+        base = dict(
+            price=0, pre_close=0, open=0, high=0, low=0,
+            vol=0, cur_vol=0, amount=0, s_vol=0, b_vol=0,
+            active1=0, active2=0,
+            bid1=0, bid_vol1=0, bid2=0, bid_vol2=0, bid3=0, bid_vol3=0,
+            bid4=0, bid_vol4=0, bid5=0, bid_vol5=0,
+            ask1=0, ask_vol1=0, ask2=0, ask_vol2=0, ask3=0, ask_vol3=0,
+            ask4=0, ask_vol4=0, ask5=0, ask_vol5=0,
+            rise_speed=0, limit_up=0, limit_down=0,
+        )
+        base.update(kw)
+        return SecurityQuote(Market.SH, code, **base)
+
+    # 880005: 计数字段=真实家数/10；amount/vol 不缩放，原样透传
+    q_stat = _zero_quote(
         "880005",
-        price=3000.0,  # up = int(price)
-        pre_close=0,
-        open=2000.0,  # down = int(open)
-        high=5500.0,  # total = int(high)
-        low=500.0,  # neutral = int(low)
+        price=300.0,    # up   = 300 * 10 = 3000
+        open=200.0,     # down = 200 * 10 = 2000
+        high=550.0,     # total= 550 * 10 = 5500
+        low=50.0,       # neutral = 50 * 10 = 500
         vol=1000000.0,
-        cur_vol=0,
         amount=50000000.0,
-        s_vol=0,
-        b_vol=0,
-        active1=0,
-        active2=0,
-        bid1=0,
-        bid_vol1=0,
-        bid2=0,
-        bid_vol2=0,
-        bid3=0,
-        bid_vol3=0,
-        bid4=0,
-        bid_vol4=0,
-        bid5=0,
-        bid_vol5=0,
-        ask1=0,
-        ask_vol1=0,
-        ask2=0,
-        ask_vol2=0,
-        ask3=0,
-        ask_vol3=0,
-        ask4=0,
-        ask_vol4=0,
-        ask5=0,
-        ask_vol5=0,
-        rise_speed=0,
-        limit_up=0,
-        limit_down=0,
+    )
+    # 880001: 总市值指数点位（不缩放）
+    q_cap = _zero_quote("880001", price=1186.579)
+    # 880006: 涨跌停家数=真实/10
+    q_limit = _zero_quote(
+        "880006",
+        price=13.1,     # limit_up   = 131
+        open=0.6,       # limit_down = 6
     )
 
     def mock_execute(cmd):
         if isinstance(cmd, GetSecurityQuotesCmd):
-            return [mock_quote]
+            return [q_stat, q_cap, q_limit]
         return []
 
     with patch.object(TdxClient, "_execute", side_effect=mock_execute):
         stat = client.get_market_stat()
         assert isinstance(stat, pd.DataFrame)
+        # 计数字段 ×10 还原
         assert stat["up_count"].iloc[0] == 3000
         assert stat["down_count"].iloc[0] == 2000
         assert stat["neutral_count"].iloc[0] == 500
         assert stat["total_count"].iloc[0] == 5500
+        assert stat["limit_up_count"].iloc[0] == 131
+        assert stat["limit_down_count"].iloc[0] == 6
+        # suspended = total - up - down - neutral = 5500 - 5500 = 0
+        assert stat["suspended_count"].iloc[0] == 0
+        # 成交额/量不缩放，原样透传
+        assert stat["total_amount"].iloc[0] == 50000000.0
+        assert stat["total_volume"].iloc[0] == 1000000.0
+        # 总市值 = 1186.579 * 1e10
+        assert stat["total_market_cap"].iloc[0] == 1186.579 * 1e10
 
 
 def test_get_history_fund_flow_parsing():

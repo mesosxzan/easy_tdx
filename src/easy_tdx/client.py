@@ -676,11 +676,11 @@ class TdxClient:
         return _to_df(records)
 
     def get_market_stat(self) -> pd.DataFrame:
-        """获取 A 股全市场涨跌统计概况（基于 880005 行情统计）。
+        """获取 A 股全市场涨跌统计概况（基于 880005/880001/880006 统计指数）。
 
-        注意：
-            `suspended_count` 是 `total - up - down - neutral` 的残差估算值，
-            用于保证计数守恒，不应视为协议已明确验证的停牌字段。
+        通达信这三个"统计指数"的计数类字段（涨/跌/平/总数/涨停/跌停家数）
+        返回的是真实家数的 1/10，需统一 ×10 还原。成交额/量/市值字段不受影响。
+        `suspended_count` 由 `total - up - down - neutral` 推得，用于保证计数守恒。
         """
         # 通达信中 880005 是全市场行情统计，880001 是总市值指数，880006 是涨跌停统计
         quotes = self._execute(
@@ -691,13 +691,14 @@ class TdxClient:
         if not quotes:
             raise RuntimeError("无法获取市场统计数据")
         q = quotes[0]
-        up = int(q.price)
-        down = int(q.open)
-        neutral = int(q.low)
-        total = int(q.high)
+        # 计数字段协议返回值为真实家数 / 10，这里 ×10 还原（见 docstring）
+        up = round(q.price * 10)
+        down = round(q.open * 10)
+        neutral = round(q.low * 10)
+        total = round(q.high * 10)
         market_cap = quotes[1].price * 1e10 if len(quotes) > 1 else 0.0
-        limit_down = int(quotes[2].open) if len(quotes) > 2 else 0
-        limit_up = int(quotes[2].price) if len(quotes) > 2 else 0
+        limit_down = round(quotes[2].open * 10) if len(quotes) > 2 else 0
+        limit_up = round(quotes[2].price * 10) if len(quotes) > 2 else 0
         return _to_df(
             MarketStat(
                 up_count=up,
@@ -1192,11 +1193,11 @@ class AsyncTdxClient(AsyncHeartbeatMixin):
         return _to_df(records)
 
     async def get_market_stat(self) -> pd.DataFrame:
-        """获取 A 股全市场涨跌统计概况（基于 880005 行情统计）。
+        """获取 A 股全市场涨跌统计概况（基于 880005/880001/880006 统计指数）。
 
-        注意：
-            `suspended_count` 是 `total - up - down - neutral` 的残差估算值，
-            用于保证计数守恒，不应视为协议已明确验证的停牌字段。
+        通达信这三个"统计指数"的计数类字段（涨/跌/平/总数/涨停/跌停家数）
+        返回的是真实家数的 1/10，需统一 ×10 还原。成交额/量/市值字段不受影响。
+        `suspended_count` 由 `total - up - down - neutral` 推得，用于保证计数守恒。
         """
         # 通达信中 880005 是全市场行情统计，880001 是总市值指数，880006 是涨跌停统计
         quotes = await self._execute(
@@ -1207,13 +1208,14 @@ class AsyncTdxClient(AsyncHeartbeatMixin):
         if not quotes:
             raise RuntimeError("无法获取市场统计数据")
         q = quotes[0]
-        up = int(q.price)
-        down = int(q.open)
-        neutral = int(q.low)
-        total = int(q.high)
+        # 计数字段协议返回值为真实家数 / 10，这里 ×10 还原（见 docstring）
+        up = round(q.price * 10)
+        down = round(q.open * 10)
+        neutral = round(q.low * 10)
+        total = round(q.high * 10)
         market_cap = quotes[1].price * 1e10 if len(quotes) > 1 else 0.0
-        limit_down = int(quotes[2].open) if len(quotes) > 2 else 0
-        limit_up = int(quotes[2].price) if len(quotes) > 2 else 0
+        limit_down = round(quotes[2].open * 10) if len(quotes) > 2 else 0
+        limit_up = round(quotes[2].price * 10) if len(quotes) > 2 else 0
         return _to_df(
             MarketStat(
                 up_count=up,
