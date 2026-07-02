@@ -9,6 +9,7 @@ import type {
   Category,
   OptimizeBacktestRequest,
   PortfolioBacktestRequest,
+  TaskListResponse,
   StrategiesResponse,
   TaskState,
   TaskSubmitResponse,
@@ -143,6 +144,13 @@ export async function fetchTask(taskId: string): Promise<TaskState> {
   const resp = await fetch(`${BASE}/backtest/tasks/${taskId}`)
   if (!resp.ok) await throwError(resp)
   return (await resp.json()) as TaskState
+}
+
+/** 列出最近任务摘要（供对比页选择）。 */
+export async function fetchTaskList(limit = 20): Promise<TaskListResponse> {
+  const resp = await fetch(`${BASE}/backtest/tasks?limit=${limit}`)
+  if (!resp.ok) await throwError(resp)
+  return (await resp.json()) as TaskListResponse
 }
 
 /**

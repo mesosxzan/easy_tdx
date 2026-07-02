@@ -185,6 +185,23 @@ class TaskStateResponse(BaseModel):
     elapsed: float = 0.0
 
 
+class TaskSummary(BaseModel):
+    """任务摘要（列表用，不含完整 result）。"""
+
+    task_id: str
+    status: Literal["pending", "running", "done", "failed"]
+    description: str = ""
+    created_at: float = 0.0
+    elapsed: float = 0.0
+
+
+class TaskListResponse(BaseModel):
+    """任务摘要列表响应。"""
+
+    tasks: list[TaskSummary]
+    count: int
+
+
 # ── 结果序列化 ─────────────────────────────────────────────────────────────────
 
 

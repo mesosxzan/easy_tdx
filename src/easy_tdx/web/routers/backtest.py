@@ -22,8 +22,10 @@ from easy_tdx.web.backtest_schemas import (
     OptimizeBacktestRequest,
     PortfolioBacktestRequest,
     StrategySchemaResponse,
+    TaskListResponse,
     TaskStateResponse,
     TaskSubmitResponse,
+    TaskSummary,
     serialize_result,
 )
 from easy_tdx.web.deps import get_client
@@ -99,6 +101,29 @@ async def run_backtest_async(
     # 提交瞬间任务应是 pending/running；极端情况下线程已跑完则报实际状态
     status: Any = state.status if state.status in ("pending", "running") else "running"
     return TaskSubmitResponse(task_id=task_id, status=status)
+
+
+@router.get("/backtest/tasks", response_model=TaskListResponse)
+async def list_tasks(limit: int = 20) -> TaskListResponse:
+    """列出最近 N 个任务摘要（按最近使用倒序，不含完整 result）。
+
+    供对比页选择要对比的 task；选中后再逐个调 /tasks/{task_id} 拉详情。
+    """
+    import time
+
+    runner = get_runner()
+    states = runner.list_recent(limit)
+    summaries = [
+        TaskSummary(
+            task_id=s.task_id,
+            status=s.status,
+            description=s.description,
+            created_at=s.created_at,
+            elapsed=(s.finished_at or time.time()) - (s.started_at or s.created_at),
+        )
+        for s in states
+    ]
+    return TaskListResponse(tasks=summaries, count=len(summaries))
 
 
 @router.get("/backtest/tasks/{task_id}", response_model=TaskStateResponse)

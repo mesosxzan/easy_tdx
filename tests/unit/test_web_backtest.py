@@ -897,3 +897,45 @@ def test_optimize_single_param_no_heatmap(client, sample_ohlcv):
         time.sleep(0.05)
     assert final["status"] == "done"
     assert final["result"]["heatmap"] is None
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: 任务列表端点（对比页用）
+# ---------------------------------------------------------------------------
+
+
+def test_list_tasks_endpoint(client, sample_ohlcv):
+    """GET /backtest/tasks 返回最近任务摘要列表。"""
+    for _ in range(2):
+        client.post(
+            "/api/v1/backtest/run/async",
+            json={"strategy": "ma_cross", "ohlcv": sample_ohlcv},
+        )
+    import time as _time
+
+    _time.sleep(0.5)
+
+    resp = client.get("/api/v1/backtest/tasks?limit=20")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["count"] >= 2
+    task = body["tasks"][0]
+    assert "task_id" in task
+    assert "status" in task
+    assert "description" in task
+    assert "result" not in task  # 摘要不含完整 result
+
+
+def test_list_tasks_limit(client, sample_ohlcv):
+    """limit 参数应限制返回数量。"""
+    for _ in range(3):
+        client.post(
+            "/api/v1/backtest/run/async",
+            json={"strategy": "ma_cross", "ohlcv": sample_ohlcv},
+        )
+    import time as _time
+
+    _time.sleep(0.5)
+
+    resp = client.get("/api/v1/backtest/tasks?limit=2")
+    assert resp.json()["count"] <= 2

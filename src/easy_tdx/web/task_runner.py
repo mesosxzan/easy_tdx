@@ -131,6 +131,17 @@ class BacktestTaskRunner:
         with self._lock:
             return self._tasks.get(task_id)
 
+    def list_recent(self, limit: int = 20) -> list[TaskState]:
+        """返回最近 N 个任务（按完成/创建时间倒序，LRU 表尾=最近）。
+
+        Args:
+            limit: 最多返回的任务数（默认 20）。
+        """
+        with self._lock:
+            # OrderedDict 尾部是最近使用的（done 时 move_to_end）；倒序取
+            items = list(reversed(self._tasks.values()))
+            return items[:limit]
+
     def status(self, task_id: str) -> TaskStatus | None:
         """取任务状态字符串，不存在返回 None。"""
         state = self.peek(task_id)

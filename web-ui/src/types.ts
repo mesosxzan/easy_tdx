@@ -136,6 +136,21 @@ export interface TaskState {
   elapsed: number
 }
 
+// ── 任务摘要（Phase 5 对比页） ────────────────────────────────────────────────
+
+export interface TaskSummary {
+  task_id: string
+  status: TaskStatus
+  description: string
+  created_at: number
+  elapsed: number
+}
+
+export interface TaskListResponse {
+  tasks: TaskSummary[]
+  count: number
+}
+
 // ── 组合回测（Phase 3） ───────────────────────────────────────────────────────
 
 export interface PortfolioBacktestRequest {
