@@ -2,6 +2,23 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.17.9] — 2026-07-04
+
+**修复 Web UI 回测「交易」统计面板离谱数值** —— 单标的回测页绩效指标右侧「交易」面板出现 `平均盈利 65409694.45%`、`最大盈利 133926612.60%`、`平均持仓天数 1173.792`、`盈亏比 0.000`（却胜率 100%）等明显异常值。根因是后端 `avg_win/avg_loss/max_win/max_loss` 返回**绝对盈亏额（元）**，前端 `MetricTable.vue` 却按**百分比小数 ×100** 显示；`_compute_avg_holding_days` 用 `YYYYMMDD` 整数相减代替真实日期相减（跨月放大，如 `20240201-20240131=70`）；`profit_factor` 在无亏损交易时被强制记为 `0.0`。真实数据复现用户场景（300580，RSI reversal n=14/超卖30/超买70/开盘价，2020-01-06~2026-07-03）验证修复：平均盈利 `65409694.45% → 26.85%`、最大盈利 `133926612.60% → 49.26%`、平均持仓 `1173.792 → 91.0 天`、盈亏比 `0.000 → 999.000`。**870 单测全绿**（+3 回归守卫），ruff format/check / mypy strict / 前端 vue-tsc 全通过。
+
+### 修复
+
+- **交易盈亏指标口径**（`src/easy_tdx/backtest/performance.py` `compute`）—— `avg_win/avg_loss/max_win/max_loss` 由「绝对盈亏额（元）」改为「单笔收益率（= pnl / cost_basis）」。新增 `cost_basis` 字段：`Trade` 增加该字段（`types.py`），`engine._compute_pnls` 在 SELL 时填入对应持仓的移动加权平均成本 × 卖出数量（`engine.py`），`_trades_to_df` 增加列。明细表 `TradeTable.vue` 的「盈亏」列仍按元显示，与汇总表的「平均盈利 %」各司其职。
+- **平均持仓天数跨月放大**（`src/easy_tdx/backtest/performance.py` `_compute_avg_holding_days`）—— 原用 `YYYYMMDD` 整数相减（如 `20240201-20240131=70`），跨月越多虚高越严重；改为解析为 `datetime.date` 后相减取真实日历日。无 `cost_basis` 列或日期无法解析时安全降级，不抛异常。
+- **盈亏比在无亏损交易时为 0**（`src/easy_tdx/backtest/performance.py`）—— 100% 胜率（无亏损交易）时 `profit_factor` 由 `0.0` 改为 `999.0`（与 `calmar` 在无回撤正收益时的约定一致），消除「胜率 100% 却盈亏比 0」的自相矛盾。
+- **object dtype 上 `np.isfinite` 崩溃**（`src/easy_tdx/backtest/performance.py`）—— 真实 engine 产出的 trades DataFrame 列可能为 int/object dtype，导致 `np.isfinite` 抛 `TypeError`；显式 `to_numpy(dtype=np.float64)` 转换。
+
+### 回归守卫
+
+- `tests/unit/test_backtest_performance.py::test_avg_holding_days_crosses_month_boundary` —— 跨月持仓必须用真实日历日（1 天），而非 YYYYMMDD 整数差（70）。
+- `tests/unit/test_backtest_performance.py::test_profit_factor_no_losing_trades_is_large` —— 全盈利无亏损时 `profit_factor == 999.0`。
+- `tests/unit/test_backtest_performance.py::test_avg_win_zero_when_no_cost_basis_column` —— trades 缺 `cost_basis` 列时 `avg_win/max_win` 安全降级为 0.0，不抛 KeyError。
+
 ## [1.17.8] — 2026-07-04
 
 **修复 Windows CI 矩阵 flaky 测试** —— `test_task_runner_does_not_evict_running` 用 `release.wait(timeout=5)` 钉住慢任务保持 running，但 CI 慢环境（windows 3.10）下整个测试执行超过 5s 后任务因超时自动完成、状态变 `done`，掩盖了「running 任务被 LRU 错误淘汰」的回归断言。改为 `timeout=30` 留足 CI 慢环境余量（`release.set()` 仍是确定性释放点）。**867 单测全绿**（本地连跑 5 次稳定通过），Windows 全矩阵转绿。

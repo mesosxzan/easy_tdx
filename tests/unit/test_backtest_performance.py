@@ -47,14 +47,18 @@ def _make_trades() -> pd.DataFrame:
     """创建测试用交易记录。
 
     Returns:
-        包含 datetime, direction, pnl, rejected 的 DataFrame
+        包含 datetime, direction, pnl, cost_basis, rejected 的 DataFrame
         4 条交易: BUY@20240101, SELL@20240106(pnl=500), BUY@20240110, SELL@20240115(pnl=-500)
+
+    注意：avg_win/avg_loss/max_win/max_loss 现为「单笔收益率」口径
+    （= pnl / cost_basis）。此处 cost_basis=10000，故收益率 = pnl/10000。
     """
     return pd.DataFrame(
         {
             "datetime": [20240101, 20240106, 20240110, 20240115],
             "direction": ["BUY", "SELL", "BUY", "SELL"],
             "pnl": [0, 500, 0, -500],
+            "cost_basis": [0.0, 10000.0, 0.0, 10000.0],
             "rejected": [False, False, False, False],
         }
     )
@@ -238,33 +242,33 @@ def test_profit_factor() -> None:
 
 
 def test_avg_win_and_loss() -> None:
-    """测试平均盈亏计算。"""
+    """测试平均盈亏计算（单笔收益率口径 = pnl / cost_basis）。"""
     equity = _make_equity_curve(n=252, total_return=0.1)
     trades = _make_trades()
 
     analyzer = PerformanceAnalyzer(equity, trades)
     metrics = analyzer.compute()
 
-    # 1 笔盈利 500，平均盈利应接近 500
-    assert abs(metrics["avg_win"] - 500) < 0.01
+    # 1 笔盈利 500 / cost_basis 10000 = 0.05（5%）
+    assert abs(metrics["avg_win"] - 0.05) < 0.001
 
-    # 1 笔亏损 500，平均亏损应接近 -500
-    assert abs(metrics["avg_loss"] - (-500)) < 0.01
+    # 1 笔亏损 -500 / cost_basis 10000 = -0.05（-5%）
+    assert abs(metrics["avg_loss"] - (-0.05)) < 0.001
 
 
 def test_max_win_and_loss() -> None:
-    """测试最大盈亏计算。"""
+    """测试最大盈亏计算（单笔收益率口径 = pnl / cost_basis）。"""
     equity = _make_equity_curve(n=252, total_return=0.1)
     trades = _make_trades()
 
     analyzer = PerformanceAnalyzer(equity, trades)
     metrics = analyzer.compute()
 
-    # 最大盈利应接近 500
-    assert abs(metrics["max_win"] - 500) < 0.01
+    # 最大盈利收益率 = 500 / 10000 = 0.05
+    assert abs(metrics["max_win"] - 0.05) < 0.001
 
-    # 最大亏损应接近 -500
-    assert abs(metrics["max_loss"] - (-500)) < 0.01
+    # 最大亏损收益率 = -500 / 10000 = -0.05
+    assert abs(metrics["max_loss"] - (-0.05)) < 0.001
 
 
 def test_annual_return() -> None:
@@ -507,3 +511,79 @@ def test_metrics_all_zero_equity_does_not_raise() -> None:
     assert np.isfinite(metrics["total_return"])
     assert np.isfinite(metrics["max_drawdown"])
     assert np.isfinite(metrics["sharpe"])
+
+
+# ── 回归测试：交易统计语义修复 ───────────────────────────────────────────────
+
+
+def test_avg_holding_days_crosses_month_boundary() -> None:
+    """跨月持仓天数必须用真实日历日计算，而非 YYYYMMDD 整数差。
+
+    回归守卫：旧实现 ``20240201 - 20240131 = 70``（整数差，错误），
+    新实现解析为 date 后相减 = 1 天。
+    """
+    equity = _make_equity_curve(n=252, total_return=0.1)
+    trades = pd.DataFrame(
+        {
+            "datetime": [20240131, 20240201],
+            "direction": ["BUY", "SELL"],
+            "pnl": [0, 100],
+            "cost_basis": [0.0, 10000.0],
+            "rejected": [False, False],
+        }
+    )
+
+    analyzer = PerformanceAnalyzer(equity, trades)
+    metrics = analyzer.compute()
+
+    # 1月31日 → 2月1日 = 1 个真实日历日（旧 bug 会得到 70）
+    assert metrics["avg_holding_days"] == 1.0
+
+
+def test_profit_factor_no_losing_trades_is_large() -> None:
+    """全部盈利、无亏损交易时 profit_factor 应为 999.0 而非 0.0。
+
+    回归守卫：旧实现在 ``len(lose_pnl)==0`` 时直接返回 0.0，
+    与 100% 胜率并列显示时自相矛盾（胜率 100% 却盈亏比 0）。
+    """
+    equity = _make_equity_curve(n=252, total_return=0.1)
+    trades = pd.DataFrame(
+        {
+            "datetime": [20240101, 20240106, 20240110, 20240115],
+            "direction": ["BUY", "SELL", "BUY", "SELL"],
+            "pnl": [0, 500, 0, 300],
+            "cost_basis": [0.0, 10000.0, 0.0, 10000.0],
+            "rejected": [False, False, False, False],
+        }
+    )
+
+    analyzer = PerformanceAnalyzer(equity, trades)
+    metrics = analyzer.compute()
+
+    assert metrics["win_trades"] == 2
+    assert metrics["lose_trades"] == 0
+    assert metrics["profit_factor"] == 999.0
+
+
+def test_avg_win_zero_when_no_cost_basis_column() -> None:
+    """trades 无 cost_basis 列时 avg_win/avg_loss/max_win/max_loss 应回退为 0.0。
+
+    回归守卫：engine._trades_to_df 现会输出 cost_basis 列，但若上游构造的
+    trades DataFrame 缺该列（如旧式直接拼装），不应抛 KeyError，应记 0.0。
+    """
+    equity = _make_equity_curve(n=252, total_return=0.1)
+    trades = pd.DataFrame(
+        {
+            "datetime": [20240101, 20240106],
+            "direction": ["BUY", "SELL"],
+            "pnl": [0, 500],
+            "rejected": [False, False],
+        }
+    )
+
+    analyzer = PerformanceAnalyzer(equity, trades)
+    metrics = analyzer.compute()
+
+    # 无 cost_basis → 单笔收益率无法计算 → 记 0.0，不抛异常
+    assert metrics["avg_win"] == 0.0
+    assert metrics["max_win"] == 0.0

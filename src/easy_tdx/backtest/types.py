@@ -53,7 +53,8 @@ class Trade:
         price: 成交价格
         commission: 手续费
         slippage: 滑点成本
-        pnl: 已实现盈亏（仅平仓时计算）
+        pnl: 已实现盈亏（仅平仓时计算，绝对金额单位：元）
+        cost_basis: SELL 对应的持仓成本基数（元），用于派生单笔收益率 pnl/cost_basis
         rejected: 是否被拒绝（资金不足/不允许做空等）
     """
 
@@ -64,6 +65,9 @@ class Trade:
     commission: float
     slippage: float
     pnl: float = 0.0
+    # SELL 对应的持仓成本基数（移动加权平均 × 本次卖出数量），用于计算收益率。
+    # BUY 行恒为 0.0。仅 _compute_pnls 平仓时填入。
+    cost_basis: float = 0.0
     rejected: bool = False
 
 

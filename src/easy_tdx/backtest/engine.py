@@ -437,6 +437,8 @@ class BacktestEngine:
                     if position_size > 0:
                         avg_cost = position_cost / position_size
                         trade.pnl = (trade.price - avg_cost) * trade.size - trade.commission
+                        # 记录本次卖出对应的持仓成本基数，用于派生单笔收益率
+                        trade.cost_basis = avg_cost * trade.size
                         position_cost -= avg_cost * trade.size
                         position_size -= trade.size
                     else:
@@ -463,6 +465,7 @@ class BacktestEngine:
                     "commission",
                     "slippage",
                     "pnl",
+                    "cost_basis",
                     "rejected",
                 ]
             )
@@ -476,6 +479,7 @@ class BacktestEngine:
                 "commission": t.commission,
                 "slippage": t.slippage,
                 "pnl": t.pnl,
+                "cost_basis": t.cost_basis,
                 "rejected": t.rejected,
             }
             for t in trades
