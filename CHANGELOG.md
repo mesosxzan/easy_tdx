@@ -2,6 +2,14 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.17.12] — 2026-07-04
+
+**修复 CI 在新版 FastAPI 上路由注册失败** —— v1.17.11 的 `DELETE /api/v1/strategies/{id}` 用 `status_code=204`，较新 FastAPI/Starlette 在路由注册阶段（`add_api_route`）就抛 `AssertionError: Status code 204 must not have a response body`，导致 CI 的 ubuntu 矩阵（py3.10/3.12/3.13）整片 ERROR（21 个 web 测试因 fixture 导入 router 而连带失败）。改为返回 `200 + {"deleted": id}` 确认体，既消除注册期断言又给前端明确反馈。
+
+### 修复
+
+- **DELETE 路由不再用 204**（`src/easy_tdx/web/routers/strategies.py`）—— `status_code=204` 改为默认 200，返回 `{"deleted": strategy_id}`；同步更新测试断言（`tests/unit/test_strategy_store.py`）。
+
 ## [1.17.11] — 2026-07-04
 
 **Web UI 新增「策略库」与「多策略组合回测」** —— 此前回测结果存在进程内存，重启即丢，用户无法留存自己反复验证过的好策略。本次落地两层能力：(1) **策略库**——在单标的/组合回测结果区点「保存策略」，把策略 + 标的上下文 + 成绩快照（总收益/夏普/回撤/胜率）一起存进本地 SQLite 单文件（`~/.easy_tdx/strategies.db`），策略库页可载入回填、一键重跑、删除；(2) **多策略组合回测**——策略库勾选 N 个单标的策略，各拿 1/N 资金、各跑原标的（取最新行情），净值曲线按日期并集对齐求和，组合结果复用单标的的 19 项完整绩效指标（基于合并净值曲线 + 汇总成交用 `PerformanceAnalyzer` 算出），并展示各策略当前持仓。**895 单测全绿**（+24 新增），ruff format/check / mypy strict / 前端 vue-tsc 全通过。

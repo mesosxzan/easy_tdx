@@ -80,9 +80,15 @@ async def create_saved_strategy(req: SavedStrategyCreate) -> SavedStrategy:
     return _to_response(saved)
 
 
-@router.delete("/strategies/{strategy_id}", status_code=204)
-async def delete_saved_strategy(strategy_id: str) -> None:
-    """按 id 删除一条已保存策略。不存在则 404。"""
+@router.delete("/strategies/{strategy_id}")
+async def delete_saved_strategy(strategy_id: str) -> dict[str, str]:
+    """按 id 删除一条已保存策略。不存在则 400。
+
+    注：不用 204（No Content），因较新 FastAPI 在路由注册阶段就拒绝
+    status_code=204 且有响应模型的端点（"204 must not have a response body"），
+    返回简单确认体更兼容、前端无需特判。
+    """
     store = get_store()
     if not store.delete(strategy_id):
         raise ValueError(f"策略 '{strategy_id}' 不存在")
+    return {"deleted": strategy_id}

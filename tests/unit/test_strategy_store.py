@@ -214,9 +214,10 @@ def test_router_create_then_list_get_delete(client: TestClient):
     assert resp.status_code == 200
     assert resp.json()["snapshot"]["total_return"] == pytest.approx(0.35)
 
-    # 4. 删除
+    # 4. 删除（返回 200 + 确认体，非 204，见路由注释）
     resp = client.delete(f"/api/v1/strategies/{sid}")
-    assert resp.status_code == 204
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == sid
 
     # 5. 列表为空
     assert client.get("/api/v1/strategies").json()["count"] == 0
