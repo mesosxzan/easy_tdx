@@ -68,11 +68,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # 首次 get_security_list_all("all") 要几十次 TDX 协议往返（几十秒），
     # 后台提前跑，让本地缓存尽早建立。用户打开页面时大概率已就绪。
     # 用 create_task 不 await，服务立即可用；预热未完成时前端遮罩接管等待。
+    # 与 /security/search-index 端点共享同一单飞任务（_build_search_index），
+    # 避免预热和首次端点请求并发各爬一次全名单。
     import asyncio
 
     async def _warmup_security_list() -> None:
         try:
-            await client.get_security_list_all(pages="all")
+            from easy_tdx.web.routers.market import _build_search_index
+
+            await asyncio.wait_for(_build_search_index(client), timeout=120)
             logger.info("Security list warmup done")
         except Exception:
             logger.warning("Security list warmup failed (non-fatal)", exc_info=True)

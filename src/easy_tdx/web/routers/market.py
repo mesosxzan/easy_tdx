@@ -57,6 +57,55 @@ async def security_list_all(
 # 进程级缓存：5206 条记录的 {code, name, initials} 只算一次，热重启即丢。
 # 前端拉一次后模块级缓存，按 code/name.includes/initials.includes 三路过滤。
 _SEARCH_INDEX: list[dict[str, str]] | None = None
+# 单飞 Future：预热（lifespan）与端点请求共享同一任务，避免并发爬两次全名单。
+# 首次请求会 await 这个 Future；后续请求命中 _SEARCH_INDEX 直接返回。
+_SEARCH_INDEX_TASK: Any = None  # asyncio.Future[list[dict[str, str]]]
+
+
+async def _build_search_index(client: Any) -> list[dict[str, str]]:
+    """构建搜索索引：拉全名单 + pypinyin 预计算声母。耗时几十秒（首次）。"""
+    import asyncio
+
+    global _SEARCH_INDEX, _SEARCH_INDEX_TASK
+    # 双重检查：等待期间可能已被其他协程填好
+    if _SEARCH_INDEX is not None:
+        return _SEARCH_INDEX
+    # 单飞：已有进行中的任务则复用，避免预热 + 端点请求并发爬两次
+    if _SEARCH_INDEX_TASK is None:
+        _SEARCH_INDEX_TASK = asyncio.get_running_loop().create_future()
+
+        async def _do_build() -> None:
+            global _SEARCH_INDEX, _SEARCH_INDEX_TASK
+            from pypinyin import Style, lazy_pinyin
+
+            try:
+                df = await client.get_security_list_all(pages="all")
+                index: list[dict[str, str]] = []
+                for row in df.itertuples(index=False):
+                    name = str(getattr(row, "name", "") or "")
+                    if not name:
+                        continue
+                    code = str(getattr(row, "code", ""))
+                    initials = "".join(lazy_pinyin(name, style=Style.FIRST_LETTER))
+                    index.append({"code": code, "name": name, "initials": initials})
+                _SEARCH_INDEX = index
+                if not _SEARCH_INDEX_TASK.done():
+                    _SEARCH_INDEX_TASK.set_result(index)
+            except Exception as e:
+                # 失败清空 task，允许下次重试
+                if not _SEARCH_INDEX_TASK.done():
+                    _SEARCH_INDEX_TASK.set_exception(e)
+                _SEARCH_INDEX_TASK = None
+                raise
+            finally:
+                # 成功后清空 task 引用（结果已存 _SEARCH_INDEX）
+                _SEARCH_INDEX_TASK = None
+
+        asyncio.create_task(_do_build())
+
+    from typing import cast
+
+    return cast("list[dict[str, str]]", await _SEARCH_INDEX_TASK)
 
 
 @router.get("/security/search-index")
@@ -68,24 +117,13 @@ async def security_search_index(
     数据源复用 :meth:`get_security_list_all`（沪深 A 股，已有本地日级缓存）。
     声母用 pypinyin ``FIRST_LETTER`` 预计算（如 中际旭创→zjxc）。
     进程内缓存，首次请求算一次后常驻；强制刷新重启进程即可。
+
+    与 lifespan 预热共享同一单飞任务（``_build_search_index``），
+    避免预热和首次端点请求并发各爬一次全名单。
     """
-    global _SEARCH_INDEX
     if _SEARCH_INDEX is not None:
         return {"count": len(_SEARCH_INDEX), "data": _SEARCH_INDEX}
-
-    from pypinyin import Style, lazy_pinyin
-
-    df = await client.get_security_list_all(pages="all")
-    index: list[dict[str, str]] = []
-    for row in df.itertuples(index=False):
-        name = str(getattr(row, "name", "") or "")
-        if not name:
-            continue
-        code = str(getattr(row, "code", ""))
-        initials = "".join(lazy_pinyin(name, style=Style.FIRST_LETTER))
-        index.append({"code": code, "name": name, "initials": initials})
-
-    _SEARCH_INDEX = index
+    index = await _build_search_index(client)
     return {"count": len(index), "data": index}
 
 
