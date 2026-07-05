@@ -22,7 +22,7 @@ const emit = defineEmits<{
   confirm: [code: string]
 }>()
 
-const { ready, loadError, search } = useStockSearch()
+const { ready, loadError, ensureLoaded, search } = useStockSearch()
 
 // 输入框文本（可能是代码片段、拼音、中文）。与 code 解耦：
 // code 是最终选定的 6 位代码，inputText 是用户正在敲的内容
@@ -117,6 +117,9 @@ function onBlur() {
 }
 
 function onFocus() {
+  // 首次聚焦输入框才触发索引拉取（按需加载，避免挂载即拉阻塞行情请求）。
+  // 详见 useStockSearch.ts 顶部注释。
+  ensureLoaded()
   // 聚焦时若已有输入且非完整代码，重新展示建议
   nextTick(() => {
     if (inputText.value.trim() && !isFullCode.value && suggestions.value.length > 0) {

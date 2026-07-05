@@ -104,11 +104,19 @@ export async function fetchBars(
 }
 
 /** 拉取股票搜索索引（code/name/initials，约 5000 条，~150KB）。
- *  前端 useStockSearch 会模块级缓存，整个会话只拉一次。 */
+ *  前端 useStockSearch 会模块级缓存，整个会话只拉一次。
+ *  超时 15 秒放弃——后端首次构建索引要走全量 get_security_list_all（几十秒），
+ *  超时后放弃可避免长时间独占共享连接、阻塞 /bars 行情请求。 */
 export async function fetchSearchIndex(): Promise<StockSearchIndex> {
-  const resp = await fetch(`${BASE}/security/search-index`)
-  if (!resp.ok) await throwError(resp)
-  return (await resp.json()) as StockSearchIndex
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const resp = await fetch(`${BASE}/security/search-index`, { signal: controller.signal })
+    if (!resp.ok) await throwError(resp)
+    return (await resp.json()) as StockSearchIndex
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** 把后端 bars 的单条记录归一化为统一 Bar（datetime 字段）。 */

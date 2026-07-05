@@ -1,5 +1,11 @@
 // 股票搜索 composable：模块级缓存搜索索引 + 按代码/名字/声母三路过滤。
 // 索引整会话只拉一次（~150KB / 5000 条），后续过滤纯本地计算（<5ms）。
+//
+// ⚠️ 重要：索引构建是"按需触发"——只在用户首次聚焦搜索输入框时才拉取，
+// 不在组件挂载时自动拉。原因是后端首次构建索引要走全量 get_security_list_all
+// （几十次 TDX 协议往返，几十秒），而 AsyncTdxClient 是单连接 + _execute_lock，
+// 索引构建期间会独占连接、阻塞所有 /bars 行情请求。按需触发确保"打开页面
+// 直接点取行情/寻优"的核心路径不被搜索索引拖累。
 
 import { ref } from 'vue'
 
@@ -40,25 +46,31 @@ async function ensureIndex(): Promise<StockSearchEntry[]> {
 export interface UseStockSearch {
   /** 索引是否已加载就绪 */
   ready: ReturnType<typeof ref<boolean>>
-  /** 加载错误信息（空串表示无错） */
+  /** 加载错误信息（空串表示无错；搜索不可用时静默降级，不阻塞主流程） */
   loadError: ReturnType<typeof ref<string>>
-  /** 按输入过滤，返回最多 limit 条（默认 30） */
+  /** 显式触发索引加载（首次聚焦输入框时调用）。静默失败，不抛错。 */
+  ensureLoaded: () => void
+  /** 按输入过滤，返回最多 limit 条（默认 30）。索引未就绪时返回空数组。 */
   search: (query: string, limit?: number) => Promise<StockSearchEntry[]>
 }
 
-/** 股票搜索：懒加载索引 + 本地三路过滤。 */
+/** 股票搜索：按需加载索引 + 本地三路过滤。 */
 export function useStockSearch(): UseStockSearch {
   const ready = ref(false)
   const loadError = ref('')
 
-  // 首次调用即触发后台拉取（不阻塞，失败记错）
-  ensureIndex()
-    .then(() => {
-      ready.value = true
-    })
-    .catch((e) => {
-      loadError.value = formatError(e)
-    })
+  function ensureLoaded() {
+    if (cachedIndex || loadPromise) return
+    ensureIndex()
+      .then(() => {
+        ready.value = true
+      })
+      .catch((e) => {
+        // 静默失败：搜索是附加功能，不能因为索引拉不到而打扰用户。
+        // 只记 loadError 供输入框显示一个小 ⚠ 图标，不弹错、不阻塞。
+        loadError.value = formatError(e)
+      })
+  }
 
   async function search(query: string, limit = 30): Promise<StockSearchEntry[]> {
     const q = query.trim().toLowerCase()
@@ -74,5 +86,5 @@ export function useStockSearch(): UseStockSearch {
     return out
   }
 
-  return { ready, loadError, search }
+  return { ready, loadError, ensureLoaded, search }
 }
