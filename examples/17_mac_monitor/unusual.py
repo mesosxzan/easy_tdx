@@ -5,7 +5,7 @@
 参数:
     market  -- 市场代码（Market.SH / Market.SZ）
     start   -- 起始偏移（默认 0）
-    count   -- 请求数量（默认 0，即 600）
+    count   -- 单次请求数量（协议上限 600，超出会被截断为 600）
 
 UnusualItem dataclass 字段:
     index         int     异动序号
@@ -26,24 +26,42 @@ UnusualItem dataclass 字段:
     desc          str      异动描述
     value         str      异动数值
     unusual_type  int      异动类型代码
+
+说明:
+    通达信 MAC 协议 0x1237 单次最多返回 600 条异动数据。
+    若要拉取全市场全部异动（盘中可能数千条），需要用 start 参数翻页，
+    每次累加 600，直到某页返回不足 600 条即为尾页。
 """
+
+import pandas as pd
 
 from easy_tdx import MacClient, Market
 
-with MacClient.from_best_host() as c:
-    # 获取沪市异动数据（最近 20 条）
-    df = c.get_unusual(Market.SH, count=20)
-    print(df.to_string(index=False))
+PAGE = 600  # 协议单次返回上限，不要改大（会被截断）
 
-# 运行结果:
-#  index  market  code   name       time          desc       value  unusual_type
-#      1       1  600XXX  XX科技  09:45:00     5分钟涨幅>3%        3.52%             1
-#      2       1  601XXX  XX银行  09:52:00     5分钟涨幅>3%        3.15%             1
-#      3       1  600XXX  XX能源  10:05:00     5分钟跌幅>3%       -3.28%             2
-#      4       1  603XXX  XX医药  10:18:00     快速拉升            5.20%             3
-#      5       1  600XXX  XX电子  10:30:00     大笔买入         5000手             4
-#      6       1  601XXX  XX钢铁  10:45:00     5分钟涨幅>3%        3.80%             1
-#      7       1  600XXX  XX化工  11:00:00     5分钟跌幅>3%       -3.65%             2
-#      8       1  603XXX  XX通信  13:15:00     快速拉升            4.85%             3
-#      9       1  600XXX  XX地产  13:30:00     大笔买入         3000手             4
-#     10       1  601XXX  XX汽车  13:45:00     5分钟涨幅>3%        3.42%             1
+with MacClient.from_best_host() as c:
+    frames = []
+    start = 0
+    while True:
+        df = c.get_unusual(Market.SH, start=start, count=PAGE)
+        if df.empty:
+            break
+        frames.append(df)
+        if len(df) < PAGE:  # 不足一页 = 已到尾
+            break
+        start += PAGE
+
+    if frames:
+        full = pd.concat(frames, ignore_index=True)
+        print(f"共获取 {len(full)} 条异动（{len(frames)} 页）")
+        print(full.to_string(index=False))
+    else:
+        print("暂无异动数据。")
+
+# 示例输出:
+#  共获取 1843 条异动（4 页）
+#   index  market  code   name       time          desc       value  unusual_type
+#       1       1  600XXX  XX科技  09:45:00     5分钟涨幅>3%        3.52%             1
+#       2       1  601XXX  XX银行  09:52:00     5分钟涨幅>3%        3.15%             1
+#       3       1  600XXX  XX能源  10:05:00     5分钟跌幅>3%       -3.28%             2
+#       ...
