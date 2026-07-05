@@ -2,6 +2,26 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.18.1] — 2026-07-06
+
+**Web UI 一键寻优多进程并发 + 策略库组合评级 + 市场前缀纠正** —— 两个独立主题合并发布。(1) 「一键寻优所有策略」此前串行跑 17 个策略的预设网格（共约 182 个网格点），在中大型机器上动辄几十秒到几分钟。本次引入 `ProcessPoolExecutor` 多进程并发，配置区新增并发数选择器（串行 / 4 / 8 / 16 进程，自动检测 CPU 核数并标注推荐档），实测 8 进程可提速 4-6×。**关键认知**：回测是 numpy/pandas 的 CPU 密集计算并持有 GIL，多线程无加速，必须用多进程；照搬项目里已跑通的 `screen/scanner.py` 进程池模板。(2) 策略库「组合回测」结果区补上组合评级徽章（与单标的回测/组合页同口径的 5 维度评分），同时修复历史保存策略的市场前缀错配（5 开头的沪市基金/ETF 曾被误判为深市）。
+
+### 新增
+
+- **一键寻优多进程并发**（`src/easy_tdx/web/routers/backtest.py` + `backtest_schemas.py`）—— `OptimizeAllBacktestRequest` 新增 `workers` 字段（默认 1=串行，范围 0-32）。抽出模块顶层函数 `_optimize_one_strategy`（可被 `ProcessPoolExecutor` pickle），`_run_optimize_all` 在 `workers >= 2` 时用进程池并行寻优，`workers` 为 0 或 1 时走原串行逻辑（向后兼容）。进程池在函数内 `with` 创建/销毁，对前端轮询与 `task_runner` 透明。
+- **并发数选择器**（`web-ui/src/views/OptimizeView.vue`）—— 配置区新增「一键寻优并发」区：自动检测 CPU 核数（`navigator.hardwareConcurrency`）+ 串行/4/8/16 进程下拉，默认串行，标注推荐档（`min(CPU, 8)`）。默认串行的考量：Windows spawn 启动开销大，小机器上多进程可能反而更慢，让用户先实测再开并发。
+- **策略库组合评级**（`web-ui/src/views/StrategiesView.vue`）—— 组合回测结果区新增「组合评级」详情块，从 `combined_equity` 重算夏普/卡玛/回撤/波动率等 5 维度评分，复用 `gradePortfolio`（与 `/portfolio` 页和单标的回测页同口径），让用户一眼判断这个组合该不该经常参与。
+
+### 变更
+
+- **市场前缀判断统一**（`web-ui/src/views/BacktestView.vue` + `StrategiesView.vue`）—— `BacktestView.fullSymbol` 此前硬编码规则（6/9 开头 SH，8/4 开头 BJ，其余 SZ），漏判 5 开头的沪市基金/ETF（如 `515030` 被误判为 SZ）。改为复用 `market.ts` 的 `detectMarket`（与 `SymbolPicker` / `StocksPicker` 同一套规则）。`StrategiesView` 新增 `normalizeSymbol`，在发请求前重算历史保存策略的市场前缀，纠正历史数据 + 兜底未来。
+- **`backtest_schemas.py` 代码风格** —— 修复 `SavedStrategyCreate.kind` 字段描述行超过 ruff 100 字符上限（E501）的历史遗留。
+
+### 已知约束（非 bug）
+
+- **并发默认串行** —— 多进程在 Windows 上 spawn 子进程有启动开销，CPU 核数少的机器开并发可能反而更慢。因此 UI 默认选串行，让用户先用同一标的、串行 vs 并行各跑一次对比耗时，再决定是否开并发。
+- **并发仅对「一键寻优所有策略」生效** —— 单策略寻优（`/backtest/optimize/run/async`）内部网格点也可并行，但收益小、复杂度高，本次未做。
+
 ## [1.18.0] — 2026-07-05
 
 **Web UI 策略库新增「策略组合」保存能力 + 分类 Tab** —— 此前用户在策略库勾选多个单标的策略做组合回测，跑出满意结果后却**无法保存**这个组合，下次要重新勾选重新跑。更关键的是，用户真正的诉求是「下次打开就知道哪些该买、哪些该卖」——这本质是要**截至今天的策略信号**，而非静态存档。本次落地：在策略库融入 `kind: 'multi'` 类型，组合回测结果区加「💾 保存为组合」按钮，组合卡片「↻ 重跑到今天」一键用今天作为结束日重跑，跑出来的"当前持仓"就是截至今天的策略信号（持仓/空仓/浮盈/浮亏）。同时把策略库拆成「单标的」/「组合」两个 Tab，避免数量多了之后混排难找。
