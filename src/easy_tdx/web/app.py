@@ -64,6 +64,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ex_client = None
     app.state.ex_client = ex_client
 
+    # --- 股票搜索索引预热（后台，不阻塞服务启动） ---
+    # 首次 get_security_list_all("all") 要几十次 TDX 协议往返（几十秒），
+    # 后台提前跑，让本地缓存尽早建立。用户打开页面时大概率已就绪。
+    # 用 create_task 不 await，服务立即可用；预热未完成时前端遮罩接管等待。
+    import asyncio
+
+    async def _warmup_security_list() -> None:
+        try:
+            await client.get_security_list_all(pages="all")
+            logger.info("Security list warmup done")
+        except Exception:
+            logger.warning("Security list warmup failed (non-fatal)", exc_info=True)
+
+    asyncio.create_task(_warmup_security_list())
+
     yield
 
     # --- 依次关闭 ---

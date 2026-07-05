@@ -1,8 +1,16 @@
 <script setup lang="ts">
-// 根组件：顶部标题栏 + 路由出口。
+// 根组件：顶部标题栏 + 路由出口 + 全局初始化遮罩。
+import AppInitOverlay from './components/AppInitOverlay.vue'
+import { useStockSearch } from './composables/useStockSearch'
+
+// App 挂载时立即开始拉取股票搜索索引，遮罩会在加载期间盖住页面。
+// 后端 lifespan 也会后台预热 get_security_list_all 缓存，多数情况下秒回。
+const { eagerLoad } = useStockSearch()
+eagerLoad()
 </script>
 
 <template>
+  <AppInitOverlay />
   <div class="app">
     <header class="app-header">
       <h1>easy-tdx 回测</h1>

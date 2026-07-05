@@ -1,24 +1,28 @@
 // 股票搜索 composable：模块级缓存搜索索引 + 按代码/名字/声母三路过滤。
 // 索引整会话只拉一次（~150KB / 5000 条），后续过滤纯本地计算（<5ms）。
 //
-// ⚠️ 重要：索引构建是"按需触发"——只在用户首次聚焦搜索输入框时才拉取，
-// 不在组件挂载时自动拉。原因是后端首次构建索引要走全量 get_security_list_all
-// （几十次 TDX 协议往返，几十秒），而 AsyncTdxClient 是单连接 + _execute_lock，
-// 索引构建期间会独占连接、阻塞所有 /bars 行情请求。按需触发确保"打开页面
-// 直接点取行情/寻优"的核心路径不被搜索索引拖累。
+// 加载策略：App 根组件挂载时调 eagerLoad() 立即开始拉取，期间 AppInitOverlay
+// 全局遮罩盖住页面（"正在初始化股票列表…"），就绪后遮罩消失。这样既保证
+// 用户进入页面时搜索已可用，又给了清晰的初始化反馈。
+// 后端 lifespan 也会后台预热 get_security_list_all 缓存，多数情况下 eagerLoad
+// 能秒回（命中后端已建好的缓存）。
 
 import { ref } from 'vue'
 
 import { fetchSearchIndex, formatError } from '../api'
 import type { StockSearchEntry } from '../types'
 
-// ── 模块级缓存（所有组件实例共享一次拉取） ─────────────────────────────────
+// ── 模块级状态（所有组件实例共享） ───────────────────────────────────────────
 let cachedIndex: StockSearchEntry[] | null = null
 let loadPromise: Promise<StockSearchEntry[]> | null = null
 
-/** 三路匹配：代码前缀 / 名字包含 / 声母包含。
- *  query 纯数字时优先按代码前缀（照顾"直接输 6 位代码"的老习惯）；
- *  含字母时按声母；任何情况都叠加名字包含（输"旭创"也能命中）。 */
+/** 全局响应式状态：所有 useStockSearch 实例共享同一组 ref，保证遮罩与输入框一致 */
+const ready = ref(false)
+const loading = ref(false)
+const failed = ref(false)
+const loadError = ref('')
+
+/** 三路匹配：代码前缀 / 名字包含 / 声母包含。 */
 function matchEntry(entry: StockSearchEntry, q: string): boolean {
   if (entry.code.startsWith(q)) return true
   if (entry.name.includes(q)) return true
@@ -26,7 +30,7 @@ function matchEntry(entry: StockSearchEntry, q: string): boolean {
   return false
 }
 
-/** 拉索引（去重并发请求；成功后常驻模块级缓存）。失败抛错，调用方处理。 */
+/** 拉索引（去重并发请求；成功后常驻模块级缓存）。失败抛错。 */
 async function ensureIndex(): Promise<StockSearchEntry[]> {
   if (cachedIndex) return cachedIndex
   if (!loadPromise) {
@@ -35,8 +39,7 @@ async function ensureIndex(): Promise<StockSearchEntry[]> {
       cachedIndex = data
       return data
     })().catch((e) => {
-      // 失败清空 promise，允许下次重试
-      loadPromise = null
+      loadPromise = null // 失败清空，允许下次重试
       throw e
     })
   }
@@ -45,30 +48,36 @@ async function ensureIndex(): Promise<StockSearchEntry[]> {
 
 export interface UseStockSearch {
   /** 索引是否已加载就绪 */
-  ready: ReturnType<typeof ref<boolean>>
-  /** 加载错误信息（空串表示无错；搜索不可用时静默降级，不阻塞主流程） */
-  loadError: ReturnType<typeof ref<string>>
-  /** 显式触发索引加载（首次聚焦输入框时调用）。静默失败，不抛错。 */
-  ensureLoaded: () => void
+  ready: typeof ready
+  /** 是否正在加载（遮罩用） */
+  loading: typeof loading
+  /** 是否加载失败（遮罩用：失败也要消失，不能卡死） */
+  failed: typeof failed
+  /** 加载错误信息 */
+  loadError: typeof loadError
+  /** App 根挂载时调用，立即开始拉取索引 */
+  eagerLoad: () => void
   /** 按输入过滤，返回最多 limit 条（默认 30）。索引未就绪时返回空数组。 */
   search: (query: string, limit?: number) => Promise<StockSearchEntry[]>
 }
 
-/** 股票搜索：按需加载索引 + 本地三路过滤。 */
+/** 股票搜索：模块级共享状态 + 本地三路过滤。 */
 export function useStockSearch(): UseStockSearch {
-  const ready = ref(false)
-  const loadError = ref('')
-
-  function ensureLoaded() {
+  function eagerLoad() {
     if (cachedIndex || loadPromise) return
+    loading.value = true
+    failed.value = false
+    loadError.value = ''
     ensureIndex()
       .then(() => {
         ready.value = true
       })
       .catch((e) => {
-        // 静默失败：搜索是附加功能，不能因为索引拉不到而打扰用户。
-        // 只记 loadError 供输入框显示一个小 ⚠ 图标，不弹错、不阻塞。
+        failed.value = true
         loadError.value = formatError(e)
+      })
+      .finally(() => {
+        loading.value = false
       })
   }
 
@@ -86,5 +95,5 @@ export function useStockSearch(): UseStockSearch {
     return out
   }
 
-  return { ready, loadError, ensureLoaded, search }
+  return { ready, loading, failed, loadError, eagerLoad, search }
 }
