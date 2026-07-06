@@ -10,6 +10,8 @@ from __future__ import annotations
 import pathlib
 import struct
 
+import pytest
+
 FIXTURES = pathlib.Path(__file__).parent.parent / "fixtures"
 
 
@@ -123,6 +125,40 @@ def test_security_bars_parse():
         assert bar.low <= bar.close + 0.001
         assert bar.vol > 0
         assert len(bar._raw) > 0
+
+
+def test_security_bars_truncated_drops_partial_last_record():
+    """TDX 服务端偶发截断：响应头声称有 N 条，但末尾记录被切。
+
+    解析器应丢弃残缺的末条，返回已成功解析的前若干条，而非整体抛 500。
+    """
+    from easy_tdx.commands.security_bars import GetSecurityBarsCmd
+    from easy_tdx.models.enums import KlineCategory, Market
+
+    body = load_hex("security_bars")  # 完整 5 条
+    # 把最后一条的 body 切掉 3 字节 → 末条 zipday 4 字节不够，触发截断
+    truncated = body[:-3]
+    cmd = GetSecurityBarsCmd(Market.SH, "600000", KlineCategory.DAY, 0, 5)
+    bars = cmd.parse_response(truncated)
+
+    assert len(bars) == 4  # 前 4 条完整，末条残缺被丢弃
+
+
+def test_security_bars_truncated_first_record_still_raises():
+    """若连第一条都无法解析（body 完全没有记录数据），仍抛 TdxDecodeError。"""
+    from easy_tdx.commands.security_bars import GetSecurityBarsCmd
+    from easy_tdx.exceptions import TdxDecodeError
+    from easy_tdx.models.enums import KlineCategory, Market
+
+    body = load_hex("security_bars")
+    # 构造 header 声称 5 条但 body 只有 header(2 字节)+1 字节 → 第一条就截断
+    truncated = body[:3]
+    # 强行把 ret_count 写成 5
+    truncated = struct.pack("<H", 5) + truncated[2:]
+    cmd = GetSecurityBarsCmd(Market.SH, "600000", KlineCategory.DAY, 0, 5)
+
+    with pytest.raises(TdxDecodeError):
+        cmd.parse_response(truncated)
 
 
 # ---------------------------------------------------------------------------

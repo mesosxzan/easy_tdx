@@ -2,7 +2,7 @@
 // 参数寻优主页面：左配置（选标的 + 策略 + 寻优参数）/ 右报告（排名表 + 热力图）。
 // 取行情已整合进「开始寻优」。另有「一键寻优所有策略」：用各策略预设网格逐策略寻优再全局排名。
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import GradeBadge from '../components/GradeBadge.vue'
@@ -44,16 +44,38 @@ const cpuCount = (() => {
   const n = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : undefined
   return n && n > 0 ? n : 4
 })()
-// 推荐档：min(cpu, 8)。默认串行（workers=0），让用户实测后再开并发——
-// 小机器上 Windows spawn 子进程开销可能反而拖慢单个寻优任务。
+// 推荐档：min(cpu, 8)。默认 8 进程，若用户改过则记到 localStorage，
+// 下次以其最后一次选择为默认。
 const recommendedWorkers = Math.min(cpuCount, 8)
-const workers = ref(0)
+const DEFAULT_WORKERS = 8
+const WORKERS_STORAGE_KEY = 'optimize.workers'
 const WORKER_OPTIONS: { value: number; label: string }[] = [
   { value: 0, label: '串行（不并发）' },
   { value: 4, label: '4 进程' },
   { value: 8, label: '8 进程' },
   { value: 16, label: '16 进程' },
 ]
+function loadWorkersFromStorage(): number {
+  try {
+    const raw = localStorage.getItem(WORKERS_STORAGE_KEY)
+    if (raw == null) return DEFAULT_WORKERS
+    const n = Number(raw)
+    return Number.isFinite(n) && WORKER_OPTIONS.some((o) => o.value === n)
+      ? n
+      : DEFAULT_WORKERS
+  } catch {
+    return DEFAULT_WORKERS
+  }
+}
+const workers = ref(loadWorkersFromStorage())
+// 用户修改后持久化,下次以最后选择为默认
+watch(workers, (v) => {
+  try {
+    localStorage.setItem(WORKERS_STORAGE_KEY, String(v))
+  } catch {
+    /* localStorage 不可用时静默忽略 */
+  }
+})
 // 成交价模式（精简为 开盘价/收盘价）
 const EXECUTIONS: { value: ExecutionMode; label: string }[] = [
   { value: 'next_open', label: '开盘价' },

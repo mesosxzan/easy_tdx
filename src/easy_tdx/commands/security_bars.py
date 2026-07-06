@@ -1,14 +1,18 @@
 """获取 K 线数据命令（支持全部周期）。"""
 
+import logging
 import struct
 
 from .._binary import unpack_from
 from ..codec.datetime_ import get_datetime
 from ..codec.price import get_price
 from ..codec.volume import get_volume
+from ..exceptions import TdxDecodeError
 from ..models.bar import SecurityBar
 from ..models.enums import KlineCategory, Market
 from .base import BaseCommand
+
+_log = logging.getLogger(__name__)
 
 
 class GetSecurityBarsCmd(BaseCommand[list[SecurityBar]]):
@@ -63,17 +67,33 @@ class GetSecurityBarsCmd(BaseCommand[list[SecurityBar]]):
         pre_diff_base = 0
         cat = int(self.category)
 
-        for _ in range(ret_count):
+        for i in range(ret_count):
             record_start = pos
-            year, month, day, hour, minute, pos = get_datetime(cat, body, pos)
+            try:
+                year, month, day, hour, minute, pos = get_datetime(cat, body, pos)
 
-            open_diff, pos = get_price(body, pos)
-            close_diff, pos = get_price(body, pos)
-            high_diff, pos = get_price(body, pos)
-            low_diff, pos = get_price(body, pos)
+                open_diff, pos = get_price(body, pos)
+                close_diff, pos = get_price(body, pos)
+                high_diff, pos = get_price(body, pos)
+                low_diff, pos = get_price(body, pos)
 
-            vol, pos = get_volume(body, pos)
-            amount, pos = get_volume(body, pos)
+                vol, pos = get_volume(body, pos)
+                amount, pos = get_volume(body, pos)
+            except TdxDecodeError as e:
+                # TDX 服务端偶发截断：响应头声称有 N 条，但 body 末尾若干条
+                # 被切掉（停牌/退市/分页边界常见）。丢弃残缺的末条，保留已
+                # 成功解析的前若干条，避免一条坏数据让整页 500。
+                if bars:
+                    _log.warning(
+                        "K线响应在第 %d/%d 条处被截断（%s），已丢弃末尾残缺记录，"
+                        "返回前 %d 条",
+                        i + 1,
+                        ret_count,
+                        e,
+                        len(bars),
+                    )
+                    return bars
+                raise
 
             # 差分还原（与 pytdx 完全一致）
             open_abs = open_diff + pre_diff_base
@@ -116,21 +136,35 @@ class GetIndexBarsCmd(GetSecurityBarsCmd):
         pre_diff_base = 0
         cat = int(self.category)
 
-        for _ in range(ret_count):
+        for i in range(ret_count):
             record_start = pos
-            year, month, day, hour, minute, pos = get_datetime(cat, body, pos)
+            try:
+                year, month, day, hour, minute, pos = get_datetime(cat, body, pos)
 
-            open_diff, pos = get_price(body, pos)
-            close_diff, pos = get_price(body, pos)
-            high_diff, pos = get_price(body, pos)
-            low_diff, pos = get_price(body, pos)
+                open_diff, pos = get_price(body, pos)
+                close_diff, pos = get_price(body, pos)
+                high_diff, pos = get_price(body, pos)
+                low_diff, pos = get_price(body, pos)
 
-            vol, pos = get_volume(body, pos)
-            amount, pos = get_volume(body, pos)
+                vol, pos = get_volume(body, pos)
+                amount, pos = get_volume(body, pos)
 
-            # 指数记录额外 4 字节：上涨家数 + 下跌家数（各 uint16 LE）
-            pos += 4
+                # 指数记录额外 4 字节：上涨家数 + 下跌家数（各 uint16 LE）
+                pos += 4
+            except TdxDecodeError as e:
+                if bars:
+                    _log.warning(
+                        "指数K线响应在第 %d/%d 条处被截断（%s），已丢弃末尾残缺记录，"
+                        "返回前 %d 条",
+                        i + 1,
+                        ret_count,
+                        e,
+                        len(bars),
+                    )
+                    return bars
+                raise
 
+            # 差分还原（与 pytdx 完全一致）
             open_abs = open_diff + pre_diff_base
             close_abs = open_abs + close_diff
             high_abs = open_abs + high_diff
