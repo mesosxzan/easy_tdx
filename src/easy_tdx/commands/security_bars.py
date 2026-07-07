@@ -80,19 +80,21 @@ class GetSecurityBarsCmd(BaseCommand[list[SecurityBar]]):
                 vol, pos = get_volume(body, pos)
                 amount, pos = get_volume(body, pos)
             except TdxDecodeError as e:
-                # TDX 服务端偶发截断：响应头声称有 N 条，但 body 末尾若干条
-                # 被切掉（停牌/退市/分页边界常见）。丢弃残缺的末条，保留已
-                # 成功解析的前若干条，避免一条坏数据让整页 500。
-                if bars:
-                    _log.warning(
-                        "K线响应在第 %d/%d 条处被截断（%s），已丢弃末尾残缺记录，返回前 %d 条",
-                        i + 1,
-                        ret_count,
-                        e,
-                        len(bars),
-                    )
-                    return bars
-                raise
+                # TDX 服务端偶发截断或空响应：响应头声称有 N 条，但 body
+                # 末尾若干条被切掉，甚至整条 body 除了 ret_count 头外为空。
+                # 两种情况都丢弃残缺部分，返回已成功解析的前若干条，避免
+                # 一条坏数据让整页 500。
+                # 注意：即使 bars 为空（第 1 条就崩）也 return 而非 raise ——
+                # 服务器返回 0 条数据但 ret_count 撒谎是已知现象，返回空列表
+                # 让调用方分页重试比直接 500 更友好。
+                _log.warning(
+                    "K线响应在第 %d/%d 条处被截断（%s），已丢弃末尾残缺记录，返回前 %d 条",
+                    i + 1,
+                    ret_count,
+                    e,
+                    len(bars),
+                )
+                return bars
 
             # 差分还原（与 pytdx 完全一致）
             open_abs = open_diff + pre_diff_base
@@ -151,16 +153,14 @@ class GetIndexBarsCmd(GetSecurityBarsCmd):
                 # 指数记录额外 4 字节：上涨家数 + 下跌家数（各 uint16 LE）
                 pos += 4
             except TdxDecodeError as e:
-                if bars:
-                    _log.warning(
-                        "指数K线响应在第 %d/%d 条处被截断（%s），已丢弃末尾残缺记录，返回前 %d 条",
-                        i + 1,
-                        ret_count,
-                        e,
-                        len(bars),
-                    )
-                    return bars
-                raise
+                _log.warning(
+                    "指数K线响应在第 %d/%d 条处被截断（%s），已丢弃末尾残缺记录，返回前 %d 条",
+                    i + 1,
+                    ret_count,
+                    e,
+                    len(bars),
+                )
+                return bars
 
             # 差分还原（与 pytdx 完全一致）
             open_abs = open_diff + pre_diff_base

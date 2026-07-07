@@ -248,8 +248,36 @@ def _create_app(
 
     dist_dir = _resolve_web_dist_dir()
     if dist_dir is not None:
-        app.mount("/", StaticFiles(directory=str(dist_dir), html=True), name="web-ui")
-        logger.info("Web UI mounted from %s", dist_dir)
+        # SPA fallback：前端用 createWebHistory（HTML5 history 模式），
+        # 用户直接访问 /optimize、/portfolio 等前端路由或刷新时，后端必须
+        # 返回 index.html 让 Vue Router 接管，而不是 404。
+        # 实现方式：用 StaticFiles 挂在 "/static" 提供真实文件（JS/CSS/图标），
+        # 再加一个 catch-all 路由把所有非 /api、非 /static 的 GET 请求导向
+        # index.html。但这样会改变 JS/CSS 的 URL 前缀（/assets → /static/assets），
+        # 需要改 vite base 配置，代价大。
+        # 更简单的方式：先尝试 StaticFiles 服务真实文件，找不到时 fallback。
+        # Starlette 的 StaticFiles(html=True) 不做 SPA fallback，故子类化它。
+        from pathlib import Path as _Path
+
+        from starlette.responses import FileResponse
+
+        class SPAStaticFiles(StaticFiles):
+            """StaticFiles + SPA fallback：404 时返回 index.html。"""
+
+            async def get_response(self, path: str, scope):  # type: ignore[no-untyped-def]
+                try:
+                    return await super().get_response(path, scope)
+                except Exception:
+                    # 任何 404（路径非文件）都返回 index.html，让前端路由处理。
+                    # 仅对 GET 请求生效；API 路径 (/api/v1/*) 已在前面注册，
+                    # 不会走到这里。
+                    index = _Path(str(self.directory)) / "index.html"
+                    if index.is_file():
+                        return FileResponse(str(index))
+                    raise
+
+        app.mount("/", SPAStaticFiles(directory=str(dist_dir), html=True), name="web-ui")
+        logger.info("Web UI mounted from %s (SPA fallback enabled)", dist_dir)
     else:
         logger.info("Web UI dist not found — serving API only")
 

@@ -2,6 +2,15 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.19.3] — 2026-07-07
+
+**修复 EXE 运行时两个问题：K 线空 body 仍 500 + 前端路由刷新 404** —— v1.19.2 在实际机器上运行日志暴露两个问题：(1) SH600519 等正常股票偶发请求 K 线时，通达信服务器返回 `ret_count>0` 但 body 完全为空（pos=2 剩余 0 字节），v1.18.3 的容错有 `if bars:` 条件——bars 为空时走 `raise` → 500，老人看到"取行情失败"。(2) 用户在 `/optimize`、`/portfolio` 等前端路由页面刷新时，后端 StaticFiles 找不到文件返回 404（SPA fallback 缺失）。
+
+### 修复
+
+- **K 线空 body 不再 500**（`src/easy_tdx/commands/security_bars.py`）—— 移除 `if bars:` 条件，无论已解析条数多少，`TdxDecodeError` 都 `return bars`（空列表让前端分页重试比直接 500 友好）。日志证据：`偏移 2，实际剩余 0 字节` = body 只有 ret_count 头、第 1 条 datetime 就崩。`GetIndexBarsCmd`（指数 K 线）同改。更新 `test_security_bars_truncated_first_record_still_raises`（原断言 raise，现断言返回空列表）+ 新增 `test_security_bars_ret_count_lies_body_completely_empty` 回归守卫。
+- **SPA fallback**（`src/easy_tdx/web/app.py`）—— 子类化 `StaticFiles` 为 `SPAStaticFiles`，404 时返回 `index.html` 让 Vue Router 接管。修复 `/optimize`、`/portfolio`、`/compare`、`/strategies` 等前端路由刷新 404。API 路径（`/api/v1/*`）已在路由表注册，不受影响。
+
 ## [1.19.2] — 2026-07-07
 
 **修复干净 Windows 上 EXE 双击后页面纯黑** —— v1.19.1 在没装开发工具的 Windows（如老人电脑）上双击 EXE，浏览器打开 `localhost:8000` 后页面纯黑、`/docs` 却能正常打开。根因：干净 Windows 的注册表里没有 `.js` 文件的 `Content Type` 映射，Python 的 `mimetypes.guess_type('.js')` 返回 `None`，FastAPI/Starlette 的 `StaticFiles` 回退到 `text/plain`。但 `index.html` 里的 `<script type="module">` 启用严格 MIME 检查，浏览器拒绝执行 `text/plain` 的 JS（报错 `Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/plain"`），Vue 根本不挂载 → 纯黑。修复：在 mount 前用 `mimetypes.add_type` 强制注册 `.js/.mjs/.css/.svg` 的正确 MIME，无论机器装没装开发工具都生效。

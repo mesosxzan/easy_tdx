@@ -97,3 +97,17 @@ def test_security_bars_complete_body_not_affected() -> None:
     bars = cmd.parse_response(body)
     assert len(bars) == 2
     assert (bars[1].year, bars[1].month, bars[1].day) == (2024, 1, 2)
+
+
+def test_security_bars_ret_count_lies_body_completely_empty() -> None:
+    """ret_count 撒谎说有数据但 body 只有 ret_count 头（0 条记录数据）。
+
+    回归 v1.19.2 日志报错：SH600519 请求 count=800，服务器返回 ret_count=5
+    但 body 从 pos=2 开始就为空，第 1 条 datetime 解析即崩（偏移 2，剩余 0）。
+    v1.18.3 的容错有 ``if bars:`` 条件，bars 为空时走 ``raise`` → 500。
+    修复后无论 bars 是否为空都 return（空列表让调用方重试比 500 好）。
+    """
+    body = struct.pack("<H", 5)  # ret_count=5，但 0 字节记录数据
+    cmd = GetSecurityBarsCmd(Market.SH, "600519", KlineCategory.DAY, 0, 800)
+    bars = cmd.parse_response(body)
+    assert bars == []

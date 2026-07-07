@@ -144,10 +144,14 @@ def test_security_bars_truncated_drops_partial_last_record():
     assert len(bars) == 4  # 前 4 条完整，末条残缺被丢弃
 
 
-def test_security_bars_truncated_first_record_still_raises():
-    """若连第一条都无法解析（body 完全没有记录数据），仍抛 TdxDecodeError。"""
+def test_security_bars_truncated_first_record_returns_empty():
+    """若连第一条都无法解析（body 完全没有记录数据），返回空列表而非抛异常。
+
+    v1.19.2 实测：SH600519 等正常股票偶发返回 ret_count>0 但 body 为空，
+    服务器侧问题。v1.18.3 的容错有 ``if bars:`` 条件导致此场景仍 raise → 500，
+    老人看到"取行情失败"。改为始终 return（空列表让前端分页重试比 500 好）。
+    """
     from easy_tdx.commands.security_bars import GetSecurityBarsCmd
-    from easy_tdx.exceptions import TdxDecodeError
     from easy_tdx.models.enums import KlineCategory, Market
 
     body = load_hex("security_bars")
@@ -157,8 +161,8 @@ def test_security_bars_truncated_first_record_still_raises():
     truncated = struct.pack("<H", 5) + truncated[2:]
     cmd = GetSecurityBarsCmd(Market.SH, "600000", KlineCategory.DAY, 0, 5)
 
-    with pytest.raises(TdxDecodeError):
-        cmd.parse_response(truncated)
+    bars = cmd.parse_response(truncated)
+    assert bars == []
 
 
 # ---------------------------------------------------------------------------
