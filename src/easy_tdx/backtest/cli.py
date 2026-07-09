@@ -256,8 +256,8 @@ def _print_table(result: Any) -> None:
     click.echo(f"交易次数: {perf.get('total_trades', 0)}")
     click.echo()
 
-    if perf.get("diagnostic_warning"):
-        click.echo(f"⚠ 诊断: {perf['diagnostic_warning']}")
+    if getattr(result, "diagnostic", None):
+        click.echo(f"⚠ 诊断: {result.diagnostic}")
         click.echo()
 
     click.echo("=== 配置参数 ===")

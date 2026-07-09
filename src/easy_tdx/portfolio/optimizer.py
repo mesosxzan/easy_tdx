@@ -126,7 +126,7 @@ class FactorWeightedOptimizer(WeightOptimizer):
         top = factor_scores.nlargest(n_stocks, "score")
         if len(top) == 0:
             return {}
-        scores = top["score"].to_numpy(dtype=np.float64)
+        scores: npt.NDArray[np.float64] = top["score"].to_numpy(dtype=np.float64)
         if len(scores) > 10:
             q95 = np.percentile(scores, 95)
             q05 = np.percentile(scores, 5)
@@ -160,10 +160,10 @@ class RiskParityOptimizer(WeightOptimizer):
         if len(top) == 0:
             return {}
         if "volatility" in top.columns:
-            vol = top["volatility"].to_numpy(dtype=np.float64)
+            vol: npt.NDArray[np.float64] = top["volatility"].to_numpy(dtype=np.float64)
         else:
-            scores = top["score"].abs().to_numpy(dtype=np.float64)
-            vol = 1.0 / (scores + 1e-8)
+            scores: npt.NDArray[np.float64] = top["score"].abs().to_numpy(dtype=np.float64)
+            vol = (1.0 / (scores + 1e-8)).astype(np.float64)
         vol = np.maximum(vol, 1e-8)
         inv_vol = 1.0 / vol
         total = inv_vol.sum()
@@ -205,7 +205,7 @@ class MeanVarianceOptimizer(WeightOptimizer):
         variances = 1.0 / (np.abs(scores) + 1e-8) ** 2
         cov = np.diag(variances)
 
-        def objective(w: np.ndarray) -> float:
+        def objective(w: npt.NDArray[np.float64]) -> float:
             return float(w @ cov @ w)
 
         constraints = {"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)}

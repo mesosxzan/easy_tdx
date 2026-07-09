@@ -2,6 +2,15 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.20.2] — 2026-07-09
+
+**修复 v1.20.1 引入的 CI mypy 失败** —— v1.20.1 把 `BacktestResult.performance` 类型扩大为 `dict[str, float | str]`（为塞进 `diagnostic_warning` 字符串），破坏了 6 处下游消费方（portfolio/combo/optimizer/ranker 假设 `dict[str, float]` 做算术比较），CI mypy job 转红。本次重构为更干净的设计：诊断信息走独立的 `BacktestResult.diagnostic` 字段，performance 字典恢复 `dict[str, float]` 类型契约。顺手修复 `optimizer.py` 的 3 个既有 ndarray type-arg 错误。
+
+### 修复
+
+- **诊断信息独立字段**（`src/easy_tdx/backtest/{performance,engine,types,cli}.py`）—— `PerformanceAnalyzer.diagnostic` 属性承载数据异常提示，`BacktestResult.diagnostic: str | None` 透出，`to_dict()` 含该字段，CLI 表格显示。performance 字典回归 `dict[str, float]`（含 `sharpe_ratio`/`start_cash`/`end_value` 别名键），下游算术/比较不再类型报错。
+- **`optimizer.py` ndarray 类型标注**（`src/easy_tdx/portfolio/optimizer.py`）—— `FactorWeightedOptimizer`/`RiskParityOptimizer` 的 `scores`/`vol` 局部变量、`MeanVarianceOptimizer.objective` 参数补 `npt.NDArray[np.float64]` 标注，消除 3 个既有 mypy type-arg 错误。
+
 ## [1.20.1] — 2026-07-09
 
 **修复回测引擎 3 个用户高频踩坑的 bug**（issues #22 / #23 / #25）—— 用户最初反馈"回测统计数据缺失/异常"，排查后发现并非服务器连接问题（已建议 `easy-tdx ping`），而是回测引擎与组合优化器自身的代码缺陷：首根 bar 访问历史数据崩溃、再平衡 `n_stocks` 被无视、交易笔数统计成天数。本次逐一修复并补回归测试，同时在数据异常时给出诊断提示而非静默返回全 0。
@@ -14,7 +23,7 @@
 
 ### 新增
 
-- **绩效指标别名键 + 数据异常诊断**（`src/easy_tdx/backtest/performance.py` + `cli.py`）—— performance dict 新增 `sharpe_ratio` / `start_cash` / `end_value` 别名键，避免用户 `.get('sharpe_ratio')` 误用返回 0（issue #22 body）。资金曲线不足 2 点或有效日收益 < 2 时返回 `diagnostic_warning`（提示可能数据不全、建议 `easy-tdx ping`），CLI 表格输出显示该提示，不再静默返回全 0。
+- **绩效指标别名键 + 数据异常诊断**（`src/easy_tdx/backtest/performance.py` + `cli.py` + `types.py`）—— performance dict 新增 `sharpe_ratio` / `start_cash` / `end_value` 别名键，避免用户 `.get('sharpe_ratio')` 误用返回 0（issue #22 body）。资金曲线不足 2 点或有效日收益 < 2 时，`BacktestResult.diagnostic` 字段填充提示（可能数据不全、建议 `easy-tdx ping`），CLI 表格输出显示该提示，不再静默返回全 0。诊断信息独立于数值型 performance 字典，不破坏 `dict[str, float]` 类型契约。
 
 ### 文档
 

@@ -166,11 +166,12 @@ class BacktestEngine:
 
         # Step 4: Performance analysis
         trades_df = self._trades_to_df(trades)
-        performance = PerformanceAnalyzer(
+        analyzer = PerformanceAnalyzer(
             tracker.equity_curve,
             trades_df,
             risk_free_rate=0.03,
-        ).compute()
+        )
+        performance = analyzer.compute()
 
         # Config snapshot
         config = {
@@ -187,6 +188,7 @@ class BacktestEngine:
             trades=trades_df,
             positions=tracker.positions,
             config=config,
+            diagnostic=analyzer.diagnostic,
         )
 
     def _execute_with_model(self, signals: list[Signal], df: pd.DataFrame) -> list[Trade]:
@@ -503,10 +505,11 @@ class BacktestEngine:
         Returns:
             BacktestResult with empty DataFrames
         """
-        perf = PerformanceAnalyzer(
+        analyzer = PerformanceAnalyzer(
             pd.DataFrame(columns=["total", "drawdown", "drawdown_pct"]),
             pd.DataFrame(columns=["direction", "pnl", "rejected"]),
-        ).compute()
+        )
+        perf = analyzer.compute()
 
         return BacktestResult(
             performance=perf,
@@ -529,4 +532,5 @@ class BacktestEngine:
                 columns=["datetime", "size", "avg_price", "market_value", "unrealized_pnl"]
             ),
             config={},
+            diagnostic=analyzer.diagnostic,
         )

@@ -48,8 +48,10 @@ class PerformanceAnalyzer:
         self._equity_curve = equity_curve
         self._trades = trades
         self._risk_free_rate = risk_free_rate
+        # 数据异常诊断（资金曲线不足/恒定时填充），供上层透出给用户
+        self.diagnostic: str | None = None
 
-    def compute(self) -> dict[str, float | str]:
+    def compute(self) -> dict[str, float]:
         """计算绩效指标。
 
         Returns:
@@ -76,7 +78,8 @@ class PerformanceAnalyzer:
         """
         # 边界检查
         if len(self._equity_curve) < 2:
-            return self._empty_metrics("资金曲线不足 2 根，无法计算绩效（数据可能为空或不全）")
+            self.diagnostic = "资金曲线不足 2 根，无法计算绩效（数据可能为空或不全）"
+            return self._empty_metrics()
 
         total = self._equity_curve["total"].to_numpy()
         drawdown = self._equity_curve["drawdown"].to_numpy()
@@ -89,10 +92,11 @@ class PerformanceAnalyzer:
 
         # 日收益率数量太少时返回空指标
         if len(daily_ret) < 2:
-            return self._empty_metrics(
+            self.diagnostic = (
                 "有效日收益率不足 2 个，绩效全 0（资金曲线可能恒定，常因数据不全或"
                 "交易未生效；建议 easy-tdx ping 切换服务器后重试）"
             )
+            return self._empty_metrics()
 
         # 1. 总收益率（首根净值为 0 时无法定义，记为 0.0）
         total_return = (total[-1] / total[0]) - 1 if total[0] != 0 else 0.0
@@ -337,19 +341,17 @@ class PerformanceAnalyzer:
 
         return int(max_dd_idx - peak_idx)
 
-    def _empty_metrics(self, diagnostic: str | None = None) -> dict[str, float | str]:
-        """返回全零指标字典。
+    def _empty_metrics(self) -> dict[str, float]:
+        """返回全零指标字典（数据不足时的默认返回值）。
 
-        用于数据不足时的默认返回值。``diagnostic`` 非空时一并返回，便于
-        上层（CLI/UI）提示用户绩效全 0 的原因（典型为数据不全）。
-
-        Args:
-            diagnostic: 可选的诊断说明，写入返回字典的 ``diagnostic_warning`` 键。
+        数据异常的诊断说明通过 ``self.diagnostic`` 暴露，由上层（CLI/引擎）
+        读取后透出给用户，不污染数值型 performance 字典（保持
+        ``dict[str, float]`` 类型，避免下游算术/比较类型报错）。
 
         Returns:
-            全零的绩效指标字典（可选含 ``diagnostic_warning``）。
+            全零的绩效指标字典（含别名键 sharpe_ratio/start_cash/end_value）。
         """
-        metrics: dict[str, float | str] = {
+        return {
             "total_return": 0.0,
             "annual_return": 0.0,
             "max_drawdown": 0.0,
@@ -373,6 +375,3 @@ class PerformanceAnalyzer:
             "start_cash": 0.0,
             "end_value": 0.0,
         }
-        if diagnostic is not None:
-            metrics["diagnostic_warning"] = diagnostic
-        return metrics

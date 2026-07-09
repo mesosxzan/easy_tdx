@@ -233,9 +233,9 @@ def test_empty_equity_curve() -> None:
     # 数值指标应为 0
     numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, int | float)}
     assert all(v == 0 for v in numeric_metrics.values())
-    # issue #22：数据不全时给出诊断提示，而非静默全 0
-    assert "diagnostic_warning" in metrics
-    assert isinstance(metrics["diagnostic_warning"], str)
+    # issue #22：数据不全时给出诊断提示（analyzer.diagnostic），而非静默全 0
+    assert analyzer.diagnostic is not None
+    assert isinstance(analyzer.diagnostic, str)
 
 
 def test_single_point_equity_curve() -> None:
@@ -249,7 +249,7 @@ def test_single_point_equity_curve() -> None:
     # 数值指标应为 0（需要至少 2 个点才能计算收益率）
     numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, int | float)}
     assert all(v == 0 for v in numeric_metrics.values())
-    assert "diagnostic_warning" in metrics
+    assert analyzer.diagnostic is not None
 
 
 def test_profit_factor() -> None:

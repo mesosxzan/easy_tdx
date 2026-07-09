@@ -106,13 +106,15 @@ class BacktestResult:
         trades: 成交记录 DataFrame
         positions: 持仓快照 DataFrame
         config: 配置参数字典
+        diagnostic: 数据异常诊断（资金曲线不足/恒定时的提示），无异常时为 None
     """
 
-    performance: dict[str, float | str]
+    performance: dict[str, float]
     equity_curve: pd.DataFrame
     trades: pd.DataFrame
     positions: pd.DataFrame
     config: dict[str, Any]
+    diagnostic: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """将结果转换为 JSON 兼容字典。
@@ -125,6 +127,7 @@ class BacktestResult:
             "trades": self.trades.to_dict(orient="records"),
             "positions": self.positions.to_dict(orient="records"),
             "config": self.config,
+            "diagnostic": self.diagnostic,
         }
 
     def to_json(self) -> str:
