@@ -301,6 +301,10 @@ easy-tdx chanlun SH 600519 --multi-level 5MIN
 
 ### 回测引擎
 
+> 📖 **完整使用手册**：[docs/backtest_usage.md](docs/backtest_usage.md) ——
+> 涵盖策略编写（`init()`/`next()`）、行情数据访问、指标注册、订单模拟、
+> 绩效指标、组合回测、调仓引擎与完整示例。回测相关用法以该手册为准。
+
 内置向量回测引擎，加载 Python 策略文件即可跑回测。策略继承 `Strategy` 基类，在 `init()` 注册指标，在 `next()` 逐 bar 生成买卖信号，引擎完成订单模拟、持仓跟踪和绩效分析。
 
 **单策略回测：**

@@ -108,7 +108,7 @@ class BacktestResult:
         config: 配置参数字典
     """
 
-    performance: dict[str, float]
+    performance: dict[str, float | str]
     equity_curve: pd.DataFrame
     trades: pd.DataFrame
     positions: pd.DataFrame

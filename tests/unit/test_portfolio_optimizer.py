@@ -53,6 +53,21 @@ class TestFactorWeighted:
         w = FactorWeightedOptimizer().optimize(scores, n_stocks=3)
         assert w["A"] > w["C"]
 
+    def test_no_weight_collapse_small_n(self):
+        """issue #25: n_stocks=2 且得分接近时，权重不应坍缩到接近 0。
+
+        修复前 scores=[0.5, 0.34] 经"减最小值"后权重变成 ~1.0 / ~6e-8，
+        等于单股满仓、n_stocks=2 被忽略。修复后每只标的都有实质权重。
+        """
+        scores = pd.DataFrame({"code": ["A", "B"], "score": [0.50, 0.34]})
+        w = FactorWeightedOptimizer().optimize(scores, n_stocks=2)
+        assert len(w) == 2
+        assert abs(sum(w.values()) - 1.0) < 1e-6
+        # 两只都应有实质权重（≥ 0.05），低分股不再被压到 ~0
+        assert min(w.values()) >= 0.05
+        # 高分股权重仍更高
+        assert w["A"] > w["B"]
+
 
 class TestRiskParity:
     def test_weights_sum_to_one(self):

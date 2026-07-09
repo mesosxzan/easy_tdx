@@ -63,6 +63,7 @@ class BacktestEngine:
         chanlun_level: str | None = None,
         slippage_model: SlippageModel | None = None,
         execution_model: ExecutionModel | None = None,
+        warmup_bars: int = 0,
     ):
         """Initialize engine.
 
@@ -83,6 +84,9 @@ class BacktestEngine:
                 when provided).
             execution_model: Pluggable execution model (bypasses OrderSimulator
                 when provided).
+            warmup_bars: 指标预热 bar 数。前 ``warmup_bars`` 根不调用
+                ``next()``、不产生信号（指标 NaN 期过滤），避免早期数据不足
+                导致的越界或误信号。默认 0（向后兼容）。
         """
         self._strategy_cls = strategy if isinstance(strategy, type) else type(strategy)
         self._strategy_instance = strategy if isinstance(strategy, Strategy) else None
@@ -99,6 +103,7 @@ class BacktestEngine:
         self._chanlun_level = chanlun_level
         self._slippage_model = slippage_model
         self._execution_model = execution_model
+        self._warmup_bars = max(int(warmup_bars), 0)
 
     def run(self, df: pd.DataFrame, chanlun_result: Any | None = None) -> BacktestResult:
         """Run backtest.
@@ -279,6 +284,12 @@ class BacktestEngine:
 
         for i in range(len(df)):
             strat._set_bar_index(i)
+
+            # warmup 期（指标 NaN 预热）不调用 next()、不产生信号，但仍推进
+            # bar_index 与后续 PortfolioTracker 的资金曲线对齐。
+            if i < self._warmup_bars:
+                continue
+
             strat._call_next()
             bar_signals = strat._clear_signals()
 

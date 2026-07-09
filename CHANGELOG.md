@@ -2,6 +2,25 @@
 
 本文件记录 easy-tdx 的版本变更。格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/)。
 
+## [1.20.1] — 2026-07-09
+
+**修复回测引擎 3 个用户高频踩坑的 bug**（issues #22 / #23 / #25）—— 用户最初反馈"回测统计数据缺失/异常"，排查后发现并非服务器连接问题（已建议 `easy-tdx ping`），而是回测引擎与组合优化器自身的代码缺陷：首根 bar 访问历史数据崩溃、再平衡 `n_stocks` 被无视、交易笔数统计成天数。本次逐一修复并补回归测试，同时在数据异常时给出诊断提示而非静默返回全 0。
+
+### 修复
+
+- **首根 bar 回溯访问不再崩溃**（`src/easy_tdx/backtest/strategy.py` + `engine.py`）—— 文档示例 `self.data.close[-1]` / `[-2]` 在 `bar_index=0` 时越界抛 `IndexError`（issue #23）。`_SeriesAccessor` 负向越界改为返回 `NaN`；`BacktestEngine` 新增 `warmup_bars` 参数，预热期前 N 根不调用 `next()`、不产生信号。含回归测试。
+- **`FactorWeightedOptimizer` 权重坍缩**（`src/easy_tdx/portfolio/optimizer.py`）—— `n_stocks=2` 且因子得分接近时，"减最小值 + 1e-8"把低分标的权重压到 ~`6e-8`，等于单股满仓，`n_stocks` 被实际无视，进而出现"持仓 1 只"、`-99.98%` 回撤等荒谬结果（issue #25）。新增 `_apply_weight_floor` 权重下限（每只 ≥ `1/(N*10)`），保证入选标的都有实质权重且和仍为 1。
+- **再平衡 `total_trades` 统计错误**（`src/easy_tdx/portfolio/rebalance.py`）—— `_compute_performance` 把 `total_trades` 设成 `len(equity_curve)`（天数），而非真实交易笔数（issue #25，56 笔交易显示为 500）。改为 `len(trades_df)`。
+
+### 新增
+
+- **绩效指标别名键 + 数据异常诊断**（`src/easy_tdx/backtest/performance.py` + `cli.py`）—— performance dict 新增 `sharpe_ratio` / `start_cash` / `end_value` 别名键，避免用户 `.get('sharpe_ratio')` 误用返回 0（issue #22 body）。资金曲线不足 2 点或有效日收益 < 2 时返回 `diagnostic_warning`（提示可能数据不全、建议 `easy-tdx ping`），CLI 表格输出显示该提示，不再静默返回全 0。
+
+### 文档
+
+- **README 回测手册导航**（`README.md`）—— 在「回测引擎」章节顶部加入 `docs/backtest_usage.md` 完整使用手册的醒目提示。
+- **`backtest_usage.md` 补充 warmup 与回溯容错说明**（`docs/backtest_usage.md`）—— 记录 `warmup_bars` 参数语义、负向索引越界返回 `NaN` 的行为。
+
 ## [1.20.0] — 2026-07-08
 
 **服务器失败时自动 ping 切换，无需手动 `easy-tdx ping`** —— 解决普通用户最困惑的痛点：连不上服务器或返回空数据时，之前必须手动跑 `easy-tdx ping` 才能恢复，普通人根本不知道该这么做。现在 Python API / CLI / Web API **三入口全部自动**——服务器连不上或返回空统计指数时，自动测速、切到延迟最低的可用服务器、重试，全程对用户透明。收敛在 `_reconnect.py` 单点注入 8 个 client 的 `_execute`，零冗余、不新增配置开关。

@@ -256,6 +256,10 @@ def _print_table(result: Any) -> None:
     click.echo(f"交易次数: {perf.get('total_trades', 0)}")
     click.echo()
 
+    if perf.get("diagnostic_warning"):
+        click.echo(f"⚠ 诊断: {perf['diagnostic_warning']}")
+        click.echo()
+
     click.echo("=== 配置参数 ===")
     click.echo(f"初始资金: {config.get('cash', 0):.2f}")
     click.echo(f"佣金率: {config.get('commission', 0):.4f}")

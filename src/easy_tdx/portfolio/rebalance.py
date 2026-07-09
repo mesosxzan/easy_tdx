@@ -137,7 +137,7 @@ class RebalanceEngine:
             if trades_list
             else pd.DataFrame(columns=["datetime", "direction", "code", "shares", "price", "cost"])
         )
-        performance = self._compute_performance(equity_curve)
+        performance = self._compute_performance(equity_curve, trades_df)
         return RebalanceResult(
             rebalance_dates=rebalance_dates,
             states=states,
@@ -202,7 +202,9 @@ class RebalanceEngine:
         holdings.update(new_holdings)
         return trades_list, cash, holdings
 
-    def _compute_performance(self, equity_curve: pd.DataFrame) -> dict[str, float]:
+    def _compute_performance(
+        self, equity_curve: pd.DataFrame, trades_df: pd.DataFrame
+    ) -> dict[str, float]:
         if len(equity_curve) < 2:
             return {"total_return": 0.0, "annual_return": 0.0, "max_drawdown": 0.0, "sharpe": 0.0}
         total = equity_curve["total"].to_numpy()
@@ -224,7 +226,7 @@ class RebalanceEngine:
             "annual_return": annual_return,
             "max_drawdown": max_drawdown,
             "sharpe": sharpe,
-            "total_trades": len(equity_curve),
+            "total_trades": len(trades_df),
         }
 
     def _empty_result(self) -> RebalanceResult:
@@ -240,5 +242,6 @@ class RebalanceEngine:
                 "annual_return": 0.0,
                 "max_drawdown": 0.0,
                 "sharpe": 0.0,
+                "total_trades": 0,
             },
         )

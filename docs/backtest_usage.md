@@ -110,6 +110,9 @@ def next(self):
     prev2 = self.data.close[-2]
 ```
 
+> **提示**：回溯索引（如 `[-1]`、`[-2]`）在回测首根 bar 数据不足时返回
+> `NaN` 而非报错。如需完全跳过指标预热期，设置 `warmup_bars`（见下文）。
+
 **标准列**：`open`, `close`, `high`, `low`, `vol`, `amount`
 
 ```python
@@ -230,7 +233,23 @@ engine = BacktestEngine(
     execution="next_open",      # 成交价规则
     position_mode="full",       # 仓位模式
     reject_policy="reduce",     # 拒绝策略
+    warmup_bars=0,              # 指标预热 bar 数（前 N 根不调用 next()，不产生信号）
 )
+```
+
+### 指标预热（warmup）
+
+技术指标（如 MA20、MACD）在前若干根 bar 的值是 `NaN` 或不稳定的。为避免
+预热期产生错误信号或访问越界：
+
+- **回溯访问容错**：`self.data.close[-1]` / `[-2]` 等负向索引在首根 bar
+  （数据不足）时返回 `NaN` 而非抛 `IndexError`，策略无需手动加 `bar_index > 0`
+  守卫。
+- **warmup_bars 参数**：设置后引擎在前 `warmup_bars` 根不调用 `next()`、不
+  产生信号（资金曲线照常推进）。例如用 MA20 策略时可设 `warmup_bars=20`：
+
+```python
+engine = BacktestEngine(MyStrategy, cash=100000, warmup_bars=20)
 ```
 
 ### 成交价规则

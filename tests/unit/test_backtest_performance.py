@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from easy_tdx.backtest.performance import PerformanceAnalyzer
 
@@ -173,7 +174,7 @@ def test_empty_trades() -> None:
 
 
 def test_all_keys_present() -> None:
-    """测试所有 19 个指标都存在。"""
+    """测试所有核心指标 + 别名键都存在。"""
     equity = _make_equity_curve(n=252, total_return=0.1)
     trades = _make_trades()
 
@@ -200,33 +201,55 @@ def test_all_keys_present() -> None:
         "max_loss",
         "avg_holding_days",
         "volatility",
+        # 别名键（issue #22：兼容 .get('sharpe_ratio') 等常见叫法）
+        "sharpe_ratio",
+        "start_cash",
+        "end_value",
     }
 
-    assert set(metrics.keys()) == expected_keys
+    assert expected_keys.issubset(set(metrics.keys()))
+
+
+def test_alias_keys_match_canonical() -> None:
+    """issue #22: 别名键与标准键值一致。"""
+    equity = _make_equity_curve(n=252, total_return=0.1)
+    trades = _make_trades()
+
+    metrics = PerformanceAnalyzer(equity, trades).compute()
+
+    assert metrics["sharpe_ratio"] == metrics["sharpe"]
+    assert metrics["start_cash"] == pytest.approx(equity["total"].iloc[0])
+    assert metrics["end_value"] == pytest.approx(equity["total"].iloc[-1])
 
 
 def test_empty_equity_curve() -> None:
-    """测试空资金曲线返回全零指标。"""
+    """测试空资金曲线返回全零指标 + 诊断提示。"""
     equity = pd.DataFrame({"total": [], "drawdown": [], "drawdown_pct": []})
     trades = _make_trades()
 
     analyzer = PerformanceAnalyzer(equity, trades)
     metrics = analyzer.compute()
 
-    # 所有指标应为 0
-    assert all(v == 0 for v in metrics.values())
+    # 数值指标应为 0
+    numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, int | float)}
+    assert all(v == 0 for v in numeric_metrics.values())
+    # issue #22：数据不全时给出诊断提示，而非静默全 0
+    assert "diagnostic_warning" in metrics
+    assert isinstance(metrics["diagnostic_warning"], str)
 
 
 def test_single_point_equity_curve() -> None:
-    """测试只有一个点的资金曲线返回全零指标。"""
+    """测试只有一个点的资金曲线返回全零指标 + 诊断提示。"""
     equity = pd.DataFrame({"total": [100000], "drawdown": [0], "drawdown_pct": [0.0]})
     trades = _make_trades()
 
     analyzer = PerformanceAnalyzer(equity, trades)
     metrics = analyzer.compute()
 
-    # 所有指标应为 0（需要至少 2 个点才能计算收益率）
-    assert all(v == 0 for v in metrics.values())
+    # 数值指标应为 0（需要至少 2 个点才能计算收益率）
+    numeric_metrics = {k: v for k, v in metrics.items() if isinstance(v, int | float)}
+    assert all(v == 0 for v in numeric_metrics.values())
+    assert "diagnostic_warning" in metrics
 
 
 def test_profit_factor() -> None:

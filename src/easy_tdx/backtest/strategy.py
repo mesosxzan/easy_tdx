@@ -50,11 +50,13 @@ class _SeriesAccessor:
             key: 0=当前值, -1=前一根, -2=前两根,依此类推
 
         Returns:
-            对应位置的 float 值
+            对应位置的 float 值；越界（回测早期数据不足）返回 ``nan``，
+            而非抛 IndexError —— 策略里写 ``close[-1]`` 在首根 bar 不会崩溃，
+            与 warmup 机制配合避免指标预热期误信号。
         """
         idx = self._bar_index + key
         if idx < 0:
-            raise IndexError(f"索引 {key} 超出范围（bar_index={self._bar_index}）")
+            return float("nan")
         return float(self._series[idx])
 
     def __len__(self) -> int:

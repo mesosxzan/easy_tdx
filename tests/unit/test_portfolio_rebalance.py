@@ -74,3 +74,15 @@ class TestRebalanceEngine:
         result = engine.run(_make_market(), start_date=20240101, end_date=20240430)
         assert len(result.trades) > 0
         assert "BUY" in result.trades["direction"].values
+
+    def test_total_trades_matches_trade_rows(self):
+        """issue #25: performance['total_trades'] 应等于真实交易笔数，而非天数。"""
+        engine = RebalanceEngine(
+            optimizer=EqualWeightOptimizer(),
+            n_stocks=3,
+            rebalance_freq="M",
+        )
+        result = engine.run(_make_market(), start_date=20240101, end_date=20240430)
+        assert result.performance["total_trades"] == len(result.trades)
+        # 修复前 total_trades == len(equity_curve)（天数），明显大于交易笔数
+        assert result.performance["total_trades"] != len(result.equity_curve)

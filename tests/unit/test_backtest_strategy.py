@@ -91,11 +91,15 @@ class TestSeriesAccessor:
         assert acc[-2] == 1.0
 
     def test_index_out_of_bounds_negative(self) -> None:
-        """测试索引越界（负方向）。"""
+        """测试索引越界（负方向）返回 NaN，而非抛 IndexError。
+
+        回测早期 bar_index=0 时 close[-1] 等回溯访问不应崩溃（见 issue #23），
+        返回 NaN 让策略自然跳过预热期。
+        """
         arr = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
         acc = _SeriesAccessor(arr, bar_index=0)
-        with pytest.raises(IndexError, match="索引 -1 超出范围"):
-            _ = acc[-1]
+        val = acc[-1]
+        assert np.isnan(val)
 
     def test_len(self) -> None:
         """测试 __len__ 返回数组长度。"""
@@ -463,3 +467,75 @@ class TestStrategyBase:
         for i in range(len(df)):
             strategy._set_bar_index(i)
             strategy._call_next()
+
+
+class TestWarmupAndLookback:
+    """issue #23: close[-1] 在首根 bar 不应崩溃；warmup 期不产生信号。"""
+
+    def test_lookback_negative_returns_nan_at_bar_zero(self) -> None:
+        """_SeriesAccessor 负向越界返回 NaN（非 IndexError）。"""
+        arr = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+        acc = _SeriesAccessor(arr, bar_index=0)
+        assert np.isnan(acc[-1])
+        assert np.isnan(acc[-2])
+
+    def test_engine_no_crash_on_close_minus_one(self) -> None:
+        """文档示例：next() 里访问 close[-1]/close[-2] 不应抛 IndexError。
+
+        回归 issue #23：DualMAStrategy 在首根 bar 访问 close[-1] 崩溃。
+        """
+        from easy_tdx.backtest.engine import BacktestEngine
+
+        class LookbackStrategy(Strategy):
+            def init(self) -> None:
+                pass
+
+            def next(self) -> None:
+                # 文档记录的访问方式
+                _ = self.data.close[0]
+                _ = self.data.close[-1]
+                _ = self.data.close[-2]
+
+        df = _make_df(n=50)
+        engine = BacktestEngine(LookbackStrategy, cash=100000)
+        # 修复前：抛 IndexError；修复后：正常跑完
+        result = engine.run(df)
+        assert len(result.equity_curve) == 50
+
+    def test_warmup_bars_skips_early_next(self) -> None:
+        """warmup_bars=N 时前 N 根不调用 next()、不产生信号。"""
+        from easy_tdx.backtest.engine import BacktestEngine
+
+        next_bars: list[int] = []
+
+        class TrackingStrategy(Strategy):
+            def init(self) -> None:
+                pass
+
+            def next(self) -> None:
+                next_bars.append(self._bar_index)
+                self.buy(size=100)
+
+        df = _make_df(n=20)
+        engine = BacktestEngine(TrackingStrategy, cash=100000, warmup_bars=5)
+        engine.run(df)
+        # warmup 期（bar 0~4）不被调用
+        assert next_bars == list(range(5, 20))
+
+    def test_warmup_bars_default_zero_backward_compat(self) -> None:
+        """默认 warmup_bars=0：每根 bar 都调用 next()（向后兼容）。"""
+        from easy_tdx.backtest.engine import BacktestEngine
+
+        next_count = 0
+
+        class CountStrategy(Strategy):
+            def init(self) -> None:
+                pass
+
+            def next(self) -> None:
+                nonlocal next_count
+                next_count += 1
+
+        df = _make_df(n=15)
+        BacktestEngine(CountStrategy, cash=100000).run(df)
+        assert next_count == 15
