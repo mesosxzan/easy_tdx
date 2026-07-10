@@ -358,4 +358,3 @@ def test_apply_trades_timestamp_vs_int_df() -> None:
 
     # 修复前交易被丢弃、持仓为 0
     assert tracker.positions["size"].iloc[0] == 100
-

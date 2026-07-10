@@ -129,4 +129,3 @@ class TestRebalanceEngine:
         result = engine.run(_make_market(), start_date=20240101, end_date=20240430)
         md = result.performance["max_drawdown"]
         assert 0.0 <= md <= 1.0, f"max_drawdown={md} 应落在 [0,1]"
-
