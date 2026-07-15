@@ -6,8 +6,14 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
-from easy_tdx.web.convert import category_from_str, market_from_str
-from easy_tdx.web.deps import get_client
+from easy_tdx.mac.enums import Adjust
+from easy_tdx.web.convert import (
+    category_from_str,
+    market_from_str,
+    market_value_from_str,
+    period_from_str,
+)
+from easy_tdx.web.deps import get_client, get_mac_client
 from easy_tdx.web.schemas import DataFrameResponse
 
 router = APIRouter(tags=["bars"])
@@ -30,11 +36,17 @@ async def security_bars(
     bar_time: str = Query(
         "start", description="时间戳: start=bar开始时间(默认) / end=bar结束时间(对齐Tushare)"
     ),
-    client: Any = Depends(get_client),
+    client: Any = Depends(get_mac_client),
 ) -> DataFrameResponse:
-    """获取股票K线数据。"""
-    df = await client.get_security_bars(
-        market_from_str(market), code, category_from_str(category), start, count, bar_time=bar_time
+    """获取股票K线数据（前复权，通过 MacClient）。"""
+    df = await client.get_stock_kline(
+        market_value_from_str(market),
+        code,
+        period_from_str(category),
+        start=start,
+        count=count,
+        adjust=Adjust.QFQ,
+        bar_time=bar_time,
     )
     return _df_resp(df)
 

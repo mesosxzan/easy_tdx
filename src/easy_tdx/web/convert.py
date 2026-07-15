@@ -46,6 +46,40 @@ def category_from_str(s: str) -> Any:
         raise ValueError(f"无效K线周期 '{s}'，可选值: {valid}") from None
 
 
+def period_from_str(s: str) -> Any:
+    """将 API 周期字符串转为 MAC 协议 Period 枚举。
+
+    KlineCategory 与 Period 枚举值大部分相同，但 YEAR（9→11）和
+    SEASON（10→10, Period.QUARTERLY）存在差异，因此使用显式映射。
+    """
+    from easy_tdx.mac.enums import Period
+
+    # KlineCategory 名称 → Period 枚举的显式映射
+    _MAPPING: dict[str, Any] = {
+        "MIN_5": Period.MIN_5,
+        "MIN_15": Period.MIN_15,
+        "MIN_30": Period.MIN_30,
+        "MIN_60": Period.MIN_60,
+        "DAY": Period.DAILY,
+        "WEEK": Period.WEEKLY,
+        "MONTH": Period.MONTHLY,
+        "MIN_1": Period.MIN_1,
+        "YEAR": Period.YEARLY,
+        "SEASON": Period.QUARTERLY,
+    }
+
+    key = s.upper()
+    if key in _MAPPING:
+        return _MAPPING[key]
+    # 支持纯数字（直接作为 Period 值尝试）
+    try:
+        return Period(int(key))
+    except (ValueError, TypeError):
+        pass
+    valid = ", ".join(k for k in _MAPPING)
+    raise ValueError(f"无效K线周期 '{s}'，可选值: {valid}") from None
+
+
 # ---------------------------------------------------------------------------
 # MAC 枚举转换器
 # ---------------------------------------------------------------------------

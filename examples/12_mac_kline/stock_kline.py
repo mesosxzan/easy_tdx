@@ -34,25 +34,25 @@ from easy_tdx import Adjust, MacClient, Market, Period
 with MacClient.from_best_host() as c:
     # --- 三种复权模式对比（日线，各取 5 条） ---
     print("=== 日线 - 不复权 ===")
-    df = c.get_stock_kline(Market.SH, "600519", Period.DAILY, count=5, adjust=Adjust.NONE)
+    df = c.get_stock_kline(Market.SH, "603538", Period.DAILY, count=10, adjust=Adjust.NONE)
     print(df.to_string(index=False))
 
     print("\n=== 日线 - 前复权 ===")
-    df = c.get_stock_kline(Market.SH, "600519", Period.DAILY, count=5, adjust=Adjust.QFQ)
+    df = c.get_stock_kline(Market.SH, "603538", Period.DAILY, count=10, adjust=Adjust.QFQ)
     print(df.to_string(index=False))
 
     print("\n=== 日线 - 后复权 ===")
-    df = c.get_stock_kline(Market.SH, "600519", Period.DAILY, count=5, adjust=Adjust.HFQ)
+    df = c.get_stock_kline(Market.SH, "603538", Period.DAILY, count=10, adjust=Adjust.HFQ)
     print(df.to_string(index=False))
 
-    # --- 多周期对比（各取 5 条） ---
-    print("\n=== 周线 ===")
-    df = c.get_stock_kline(Market.SH, "600519", Period.WEEKLY, count=5)
-    print(df.to_string(index=False))
+    # # --- 多周期对比（各取 5 条） ---
+    # print("\n=== 周线 ===")
+    # df = c.get_stock_kline(Market.SH, "600519", Period.WEEKLY, count=5)
+    # print(df.to_string(index=False))
 
-    print("\n=== 5分钟线 ===")
-    df = c.get_stock_kline(Market.SH, "600519", Period.MIN_5, count=5)
-    print(df.to_string(index=False))
+    # print("\n=== 5分钟线 ===")
+    # df = c.get_stock_kline(Market.SH, "600519", Period.MIN_5, count=5)
+    # print(df.to_string(index=False))
 
 # 运行结果:
 # === 日线 - 不复权 ===
