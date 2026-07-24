@@ -2,7 +2,15 @@
 // 服务器设置页面：列出通达信行情服务器、测速、点选切换。
 // 解决"有些 IP 能连通有些不能"的问题——不同地区/运营商对各服务器连通性不同。
 import { onMounted, ref } from 'vue'
-import { fetchServerHosts, testServerHosts, switchServerHost, formatError } from '../api'
+import {
+  fetchServerHosts,
+  testServerHosts,
+  switchServerHost,
+  fetchWencaiCookie,
+  saveWencaiCookie,
+  formatError,
+} from '../api'
+import { getWencaiCookie, setWencaiCookie } from '../settings'
 import type { ServerHostInfo } from '../types'
 
 const hosts = ref<ServerHostInfo[]>([])
@@ -12,8 +20,12 @@ const testing = ref(false)
 const switchingHost = ref<string | null>(null)
 const error = ref('')
 const message = ref('')
+const wencaiCookie = ref('')
+const cookieMessage = ref('')
 
-onMounted(loadHosts)
+onMounted(async () => {
+  await Promise.all([loadHosts(), loadWencaiCookie()])
+})
 
 async function loadHosts() {
   loading.value = true
@@ -90,6 +102,46 @@ function latencyText(ms: number | null): string {
   if (ms === null) return '—'
   return `${ms} ms`
 }
+
+async function loadWencaiCookie() {
+  try {
+    const resp = await fetchWencaiCookie()
+    const legacyCookie = getWencaiCookie()
+    wencaiCookie.value = resp.cookie || legacyCookie
+  } catch (e) {
+    const legacyCookie = getWencaiCookie()
+    if (legacyCookie) {
+      wencaiCookie.value = legacyCookie
+      cookieMessage.value = '已读取浏览器本地 Cookie，点一次“保存 Cookie”即可同步到后端。'
+      return
+    }
+    error.value = formatError(e)
+  }
+}
+
+async function saveCookie() {
+  try {
+    const resp = await saveWencaiCookie(wencaiCookie.value)
+    wencaiCookie.value = resp.cookie
+    setWencaiCookie(resp.cookie)
+    cookieMessage.value = resp.has_cookie
+      ? '问财 Cookie 已保存到后端配置，后续搜索会自动携带。'
+      : '已清空问财 Cookie。'
+  } catch (e) {
+    error.value = formatError(e)
+  }
+}
+
+async function clearCookie() {
+  wencaiCookie.value = ''
+  try {
+    await saveWencaiCookie('')
+    setWencaiCookie('')
+    cookieMessage.value = '已清空问财 Cookie。'
+  } catch (e) {
+    error.value = formatError(e)
+  }
+}
 </script>
 
 <template>
@@ -107,6 +159,22 @@ function latencyText(ms: number | null): string {
         点击"测试全部"测速各服务器延迟，然后点"使用"切换到最快或可用的服务器。
         切换后立即生效，无需重启。
       </p>
+      <div class="cookie-card">
+        <h3>问财 Cookie</h3>
+        <textarea
+          v-model="wencaiCookie"
+          rows="5"
+          placeholder="粘贴同花顺问财登录后的 Cookie，保存后前端搜索会自动携带"
+        />
+        <div class="cookie-actions">
+          <button class="btn-cookie-save" @click="saveCookie">保存 Cookie</button>
+          <button class="btn-cookie-clear" @click="clearCookie">清空</button>
+        </div>
+        <p class="hint">
+          将保存到 easy-tdx 后端统一配置；浏览器本地旧值也会自动迁移。
+        </p>
+        <div v-if="cookieMessage" class="message">{{ cookieMessage }}</div>
+      </div>
       <div v-if="message" class="message">{{ message }}</div>
       <div v-if="error" class="error-banner">⚠ {{ error }}</div>
     </aside>
@@ -216,6 +284,31 @@ function latencyText(ms: number | null): string {
   font-size: 12px;
   color: var(--text-dim);
   line-height: 1.6;
+}
+.cookie-card {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+.cookie-card h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.cookie-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cookie-actions button {
+  flex: 1;
+}
+.btn-cookie-save {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+}
+.btn-cookie-clear {
+  background: var(--bg-elevated);
 }
 .message {
   margin-top: 12px;

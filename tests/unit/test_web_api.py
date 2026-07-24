@@ -54,6 +54,15 @@ def test_chanlun_request_defaults():
     assert req.count == 800
 
 
+def test_wencai_search_request_defaults():
+    """WencaiSearchRequest should have sensible defaults."""
+    pytest.importorskip("fastapi")
+    from easy_tdx.web.schemas import WencaiSearchRequest
+
+    req = WencaiSearchRequest(query="今日涨幅前十")
+    assert req.perpage == 100
+
+
 def test_api_error_response():
     """ApiErrorResponse should serialize correctly."""
     pytest.importorskip("fastapi")
@@ -194,6 +203,24 @@ def test_realtime_router_endpoints():
     assert any("realtime" in p for p in paths)
 
 
+def test_wencai_router_endpoints():
+    """Wencai router should define the semantic search endpoint."""
+    pytest.importorskip("fastapi")
+    from easy_tdx.web.routers.wencai import router
+
+    paths = [r.path for r in router.routes]
+    assert "/wencai/search" in paths
+
+
+def test_server_router_wencai_cookie_endpoints():
+    """Server router should define wencai cookie config endpoints."""
+    pytest.importorskip("fastapi")
+    from easy_tdx.web.routers.server import router
+
+    paths = [r.path for r in router.routes]
+    assert "/server/wencai-cookie" in paths
+
+
 # ---------------------------------------------------------------------------
 # Task 10: CLI serve command
 # ---------------------------------------------------------------------------
@@ -270,6 +297,8 @@ def test_full_app_routes_registered():
         "/api/v1/chanlun",
         "/api/v1/announcements",
         "/api/v1/sina/financial-report",
+        "/api/v1/wencai/search",
+        "/api/v1/server/wencai-cookie",
         "/ws/realtime",
     ]
     for prefix in expected_prefixes:
@@ -292,3 +321,5 @@ def test_openapi_schema_generated():
     # they are verified in test_full_app_routes_registered instead.
     # Just ensure REST paths are present.
     assert "/api/v1/fund-flow" in schema["paths"]
+    assert "/api/v1/wencai/search" in schema["paths"]
+    assert "/api/v1/server/wencai-cookie" in schema["paths"]

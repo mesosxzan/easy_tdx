@@ -21,6 +21,7 @@
     EASY_TDX_TIMEOUT     -- 超时秒数
     EASY_TDX_KNOWN_HOSTS -- 逗号分隔的候选主机列表
     EASY_TDX_CONFIG_DIR  -- 配置文件目录（默认 ~/.easy_tdx）
+    EASY_TDX_WENCAI_COOKIE -- 问财 Cookie
 """
 
 import json
@@ -268,6 +269,15 @@ def get_timeout() -> float:
     return cast(float, cfg.get("timeout", _FALLBACK_TIMEOUT))
 
 
+def get_wencai_cookie() -> str:
+    """返回问财 Cookie。优先级：环境变量 > config.json > 空字符串。"""
+    env = os.environ.get("EASY_TDX_WENCAI_COOKIE")
+    if env:
+        return env.strip()
+    cfg = _load()
+    return cast(str, cfg.get("wencai_cookie", "")).strip()
+
+
 # ---------------------------------------------------------------------------
 # 持久化
 # ---------------------------------------------------------------------------
@@ -327,4 +337,15 @@ def save_best_mac_host(host: str) -> None:
     cfg["best_mac_host_updated_at"] = datetime.now(_SHANGHAI_TZ).isoformat()
     if "mac_hosts" not in cfg:
         cfg["mac_hosts"] = list(_FALLBACK_MAC_HOSTS)
+    _save(cfg)
+
+
+def save_wencai_cookie(cookie: str) -> None:
+    """保存问财 Cookie 到统一配置文件。空串表示清空。"""
+    cfg = _load()
+    value = cookie.strip()
+    if value:
+        cfg["wencai_cookie"] = value
+    else:
+        cfg.pop("wencai_cookie", None)
     _save(cfg)

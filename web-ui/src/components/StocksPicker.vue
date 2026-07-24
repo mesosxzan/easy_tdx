@@ -5,6 +5,7 @@
 import { computed, ref } from 'vue'
 
 import { detectMarket, marketLabel } from '../market'
+import WencaiSourcePanel from './WencaiSourcePanel.vue'
 
 const props = defineProps<{
   modelValue: string[]
@@ -12,6 +13,7 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: string[]] }>()
 
 const code = ref('')
+const source = ref<'manual' | 'wencai'>('manual')
 const detectedMarket = computed(() => (code.value && /^\d{6}$/.test(code.value)
   ? marketLabel(detectMarket(code.value))
   : ''))
@@ -28,20 +30,41 @@ function add() {
 function remove(sym: string) {
   emit('update:modelValue', props.modelValue.filter((s) => s !== sym))
 }
+
+function addSymbol(sym: string) {
+  if (!props.modelValue.includes(sym)) {
+    emit('update:modelValue', [...props.modelValue, sym])
+  }
+}
 </script>
 
 <template>
   <div class="stocks-picker">
-    <div class="row add-row">
-      <input
-        v-model="code"
-        maxlength="6"
-        placeholder="6位代码（市场自动识别）"
-        @keyup.enter="add"
-      />
-      <button @click="add">添加</button>
+    <div class="field">
+      <label>数据来源</label>
+      <div class="source-switch">
+        <button :class="{ active: source === 'manual' }" @click="source = 'manual'">直接代码</button>
+        <button :class="{ active: source === 'wencai' }" @click="source = 'wencai'">问财结果</button>
+      </div>
     </div>
-    <p v-if="detectedMarket" class="market-hint">将识别为：{{ detectedMarket }}</p>
+
+    <template v-if="source === 'manual'">
+      <div class="row add-row">
+        <input
+          v-model="code"
+          maxlength="6"
+          placeholder="6位代码（市场自动识别）"
+          @keyup.enter="add"
+        />
+        <button @click="add">添加</button>
+      </div>
+      <p v-if="detectedMarket" class="market-hint">将识别为：{{ detectedMarket }}</p>
+    </template>
+
+    <div v-else class="field wencai-wrap">
+      <label>问财选股</label>
+      <WencaiSourcePanel mode="multi" :selected-codes="modelValue" @add="addSymbol" />
+    </div>
 
     <div v-if="modelValue.length" class="stock-list">
       <span v-for="s in modelValue" :key="s" class="stock-tag">
@@ -54,6 +77,19 @@ function remove(sym: string) {
 </template>
 
 <style scoped>
+.source-switch {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.source-switch button {
+  flex: 1;
+}
+.source-switch button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(74, 158, 255, 0.12);
+}
 .add-row {
   display: flex;
   gap: 6px;
@@ -65,6 +101,9 @@ function remove(sym: string) {
   color: var(--text-dim);
   font-size: 11px;
   margin-top: 4px;
+}
+.wencai-wrap {
+  margin-bottom: 10px;
 }
 .stock-list {
   display: flex;

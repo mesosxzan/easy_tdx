@@ -12,7 +12,14 @@ import asyncio
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from easy_tdx.config import get_best_host, get_known_hosts, get_port, save_best_host
+from easy_tdx.config import (
+    get_best_host,
+    get_known_hosts,
+    get_port,
+    get_wencai_cookie,
+    save_best_host,
+    save_wencai_cookie,
+)
 from easy_tdx.transport.sync import ping_all
 
 router = APIRouter(tags=["server"])
@@ -59,6 +66,19 @@ class SwitchResponse(BaseModel):
     ok: bool
     host: str
     message: str
+
+
+class WencaiCookieRequest(BaseModel):
+    """POST /server/wencai-cookie 的请求。"""
+
+    cookie: str = ""
+
+
+class WencaiCookieResponse(BaseModel):
+    """问财 Cookie 配置响应。"""
+
+    cookie: str
+    has_cookie: bool
 
 
 # --------------------------------------------------------------------------- #
@@ -146,6 +166,21 @@ async def switch_host(req: ServerSwitchRequest, request: Request) -> SwitchRespo
     # 连接成功后才持久化
     save_best_host(req.host)
     return SwitchResponse(ok=True, host=req.host, message=f"已切换到 {req.host}")
+
+
+@router.get("/server/wencai-cookie", response_model=WencaiCookieResponse)
+async def get_server_wencai_cookie() -> WencaiCookieResponse:
+    """读取当前问财 Cookie 配置。"""
+    cookie = get_wencai_cookie()
+    return WencaiCookieResponse(cookie=cookie, has_cookie=bool(cookie))
+
+
+@router.post("/server/wencai-cookie", response_model=WencaiCookieResponse)
+async def set_server_wencai_cookie(req: WencaiCookieRequest) -> WencaiCookieResponse:
+    """保存问财 Cookie 到统一配置。空串表示清空。"""
+    save_wencai_cookie(req.cookie)
+    cookie = get_wencai_cookie()
+    return WencaiCookieResponse(cookie=cookie, has_cookie=bool(cookie))
 
 
 # --------------------------------------------------------------------------- #

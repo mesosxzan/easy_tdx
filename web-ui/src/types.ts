@@ -47,6 +47,28 @@ export interface DataFrameResponse {
   count: number
 }
 
+// ── 问财语义搜索（POST /api/v1/wencai/search） ───────────────────────────────
+
+export interface WencaiSearchRequest {
+  query: string
+  perpage?: number
+  cookie?: string
+}
+
+/** 问财搜索结果中的单只股票。 */
+export interface WencaiStockItem {
+  symbol: string
+  market: string
+  name: string
+  stock_reason: string
+}
+
+/** 问财语义搜索响应。 */
+export interface WencaiSearchResponse {
+  data: WencaiStockItem[]
+  count: number
+}
+
 // ── 回测请求（POST /api/v1/backtest/run） ─────────────────────────────────────
 
 export type ExecutionMode = 'next_open' | 'next_close'
@@ -354,4 +376,9 @@ export interface ServerSwitchResult {
   ok: boolean
   host: string
   message: string
+}
+
+export interface WencaiCookieResponse {
+  cookie: string
+  has_cookie: boolean
 }

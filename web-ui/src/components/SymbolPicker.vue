@@ -10,6 +10,7 @@ import { fetchBars, formatError } from '../api'
 import { detectMarket, marketLabel } from '../market'
 import { useBacktestStore } from '../stores/backtest'
 import type { Category } from '../types'
+import WencaiSourcePanel from './WencaiSourcePanel.vue'
 
 const store = useBacktestStore()
 
@@ -33,6 +34,7 @@ const endDate = defineModel<string>('endDate', {
 const error = ref('')
 // loading 由父组件控制（回测/寻优时驱动），组件自身只暴露 loadBars
 const loading = ref(false)
+const source = ref<'manual' | 'wencai'>('manual')
 
 const CATEGORIES: Category[] = ['DAY', 'WEEK', 'MONTH', 'MIN_5', 'MIN_15', 'MIN_30', 'MIN_60']
 
@@ -40,6 +42,10 @@ const CATEGORIES: Category[] = ['DAY', 'WEEK', 'MONTH', 'MIN_5', 'MIN_15', 'MIN_
 const detectedMarket = computed(() => (code.value && /^\d{6}$/.test(code.value)
   ? marketLabel(detectMarket(code.value))
   : ''))
+
+function applyWencaiCode(nextCode: string) {
+  code.value = nextCode
+}
 
 /** 取行情（由父组件在点击「开始回测/开始寻优」时调用）。
  * 成功返回 true，失败返回 false（并把错误写入 store.error 供父组件感知）。 */
@@ -91,7 +97,15 @@ defineExpose({ loadBars, loading })
 
 <template>
   <div class="symbol-picker">
-    <div class="field code-field">
+    <div class="field">
+      <label>数据来源</label>
+      <div class="source-switch">
+        <button :class="{ active: source === 'manual' }" @click="source = 'manual'">直接代码</button>
+        <button :class="{ active: source === 'wencai' }" @click="source = 'wencai'">问财结果</button>
+      </div>
+    </div>
+
+    <div v-if="source === 'manual'" class="field code-field">
       <label>代码</label>
       <input
         v-model="code"
@@ -99,6 +113,14 @@ defineExpose({ loadBars, loading })
         placeholder="6位代码（市场自动识别）"
       />
       <span v-if="detectedMarket" class="market-tag">{{ detectedMarket }}</span>
+    </div>
+
+    <div v-else class="field">
+      <label>问财选股</label>
+      <WencaiSourcePanel mode="single" :selected-codes="[code]" @pick="applyWencaiCode" />
+      <p v-if="/^\d{6}$/.test(code)" class="ok chosen-code">
+        当前已选择：{{ code }}<span v-if="detectedMarket">（{{ detectedMarket }}）</span>
+      </p>
     </div>
 
     <div class="field">
@@ -127,6 +149,18 @@ defineExpose({ loadBars, loading })
 </template>
 
 <style scoped>
+.source-switch {
+  display: flex;
+  gap: 8px;
+}
+.source-switch button {
+  flex: 1;
+}
+.source-switch button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(74, 158, 255, 0.12);
+}
 .code-field {
   position: relative;
 }
@@ -153,5 +187,8 @@ defineExpose({ loadBars, loading })
   color: var(--down);
   font-size: 12px;
   margin-top: 8px;
+}
+.chosen-code {
+  margin-top: 10px;
 }
 </style>

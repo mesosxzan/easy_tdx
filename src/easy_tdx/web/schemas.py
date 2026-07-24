@@ -77,6 +77,33 @@ class ComputeIndicatorsRequest(BaseModel):
     tail: int | None = Field(default=None, ge=1, description="仅返回末尾 N 行")
 
 
+class WencaiSearchRequest(BaseModel):
+    """问财语义搜索请求。"""
+
+    query: str = Field(..., min_length=1, description="问财自然语言查询语句")
+    perpage: int = Field(default=100, ge=1, le=500, description="每页条数（最大 500）")
+    cookie: str | None = Field(
+        default=None,
+        description="可选；不传时自动读取 easy-tdx 配置中的问财 Cookie（环境变量优先）",
+    )
+
+
+class WencaiStockItem(BaseModel):
+    """问财搜索结果中的单只股票。"""
+
+    symbol: str = Field(..., description="6 位股票代码")
+    market: str = Field(..., description="市场代码（SZ/SH/BJ）")
+    name: str = Field(..., description="股票简称")
+    stock_reason: str = Field(default="", description="概念解析/入选理由")
+
+
+class WencaiSearchResponse(BaseModel):
+    """问财语义搜索响应。"""
+
+    data: list[WencaiStockItem]
+    count: int
+
+
 # ---------------------------------------------------------------------------
 # Response models
 # ---------------------------------------------------------------------------

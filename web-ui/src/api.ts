@@ -21,6 +21,10 @@ import type {
   TaskListResponse,
   TaskState,
   TaskSubmitResponse,
+  WencaiSearchRequest,
+  WencaiSearchResponse,
+  WencaiStockItem,
+  WencaiCookieResponse,
 } from './types'
 
 const BASE = '/api/v1'
@@ -103,6 +107,25 @@ export async function fetchBars(
     // 否则引擎/图表只正确处理第一页的数据。
     bars.sort((a, b) => a.datetime.localeCompare(b.datetime))
     return bars
+}
+
+/** 问财语义搜索（默认用于 A 股选股结果）。 */
+export async function fetchWencaiSearch(
+  req: WencaiSearchRequest,
+): Promise<WencaiStockItem[]> {
+  const { cookie: reqCookie, ...rest } = req
+  const resp = await fetch(`${BASE}/wencai/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      perpage: 100,
+      cookie: reqCookie?.trim() || undefined,
+      ...rest,
+    }),
+  })
+  if (!resp.ok) await throwError(resp)
+  const body = (await resp.json()) as WencaiSearchResponse
+  return body.data
 }
 
 /** 把后端 bars 的单条记录归一化为统一 Bar（datetime 字段）。 */
@@ -297,4 +320,22 @@ export async function switchServerHost(host: string): Promise<ServerSwitchResult
   })
   if (!resp.ok) await throwError(resp)
   return (await resp.json()) as ServerSwitchResult
+}
+
+/** 读取后端保存的问财 Cookie。 */
+export async function fetchWencaiCookie(): Promise<WencaiCookieResponse> {
+  const resp = await fetch(`${BASE}/server/wencai-cookie`)
+  if (!resp.ok) await throwError(resp)
+  return (await resp.json()) as WencaiCookieResponse
+}
+
+/** 保存问财 Cookie 到后端统一配置。 */
+export async function saveWencaiCookie(cookie: string): Promise<WencaiCookieResponse> {
+  const resp = await fetch(`${BASE}/server/wencai-cookie`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cookie }),
+  })
+  if (!resp.ok) await throwError(resp)
+  return (await resp.json()) as WencaiCookieResponse
 }

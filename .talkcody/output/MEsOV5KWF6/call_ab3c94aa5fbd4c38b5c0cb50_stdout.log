@@ -1,0 +1,238 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.11, pytest-8.3.4, pluggy-1.5.0 -- /Users/a1-6/.pyenv/versions/miniconda3-3.10-24.7.1-0/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/a1-6/project/easy_tdx
+configfile: pyproject.toml
+plugins: dash-3.4.0, anyio-4.6.2, hydra-core-1.3.2, docker-3.1.1
+collecting ... collected 38 items
+
+tests/unit/test_wencai.py::test_public_exports FAILED                    [  2%]
+tests/unit/test_wencai.py::test_wencai_error_subclasses_tdx_error PASSED [  5%]
+tests/unit/test_wencai.py::test_wencai_stock_dataclass_fields FAILED     [  7%]
+tests/unit/test_wencai.py::test_search_missing_cookie_raises FAILED      [ 10%]
+tests/unit/test_wencai.py::test_search_uses_env_cookie_and_returns_stocks FAILED [ 13%]
+tests/unit/test_wencai.py::test_search_uses_config_cookie_when_request_missing FAILED [ 15%]
+tests/unit/test_wencai.py::test_search_persists_explicit_cookie FAILED   [ 18%]
+tests/unit/test_wencai.py::test_search_empty_results FAILED              [ 21%]
+tests/unit/test_wencai.py::test_search_skips_invalid_items FAILED        [ 23%]
+tests/unit/test_wencai.py::test_search_wraps_request_errors FAILED       [ 26%]
+tests/unit/test_wencai.py::test_search_wraps_json_decode_errors FAILED   [ 28%]
+tests/unit/test_wencai.py::test_search_wraps_invalid_data_format FAILED  [ 31%]
+tests/unit/test_wencai.py::test_search_empty_query_raises PASSED         [ 34%]
+tests/unit/test_wencai.py::test_wencai_router_success FAILED             [ 36%]
+tests/unit/test_wencai.py::test_wencai_router_missing_cookie_returns_503 FAILED [ 39%]
+tests/unit/test_web_api.py::test_market_enum_values PASSED               [ 42%]
+tests/unit/test_web_api.py::test_kline_category_enum PASSED              [ 44%]
+tests/unit/test_web_api.py::test_quote_request_validation PASSED         [ 47%]
+tests/unit/test_web_api.py::test_chanlun_request_defaults PASSED         [ 50%]
+tests/unit/test_web_api.py::test_wencai_search_request_defaults PASSED   [ 52%]
+tests/unit/test_web_api.py::test_api_error_response PASSED               [ 55%]
+tests/unit/test_web_api.py::test_create_app_returns_fastapi_instance PASSED [ 57%]
+tests/unit/test_web_api.py::test_deps_get_client_type PASSED             [ 60%]
+tests/unit/test_web_api.py::test_market_router_endpoints PASSED          [ 63%]
+tests/unit/test_web_api.py::test_bars_router_endpoints PASSED            [ 65%]
+tests/unit/test_web_api.py::test_finance_router_endpoints PASSED         [ 68%]
+tests/unit/test_web_api.py::test_block_router_endpoints PASSED           [ 71%]
+tests/unit/test_web_api.py::test_chanlun_router_endpoints PASSED         [ 73%]
+tests/unit/test_web_api.py::test_realtime_router_endpoints PASSED        [ 76%]
+tests/unit/test_web_api.py::test_wencai_router_endpoints PASSED          [ 78%]
+tests/unit/test_web_api.py::test_server_router_wencai_cookie_endpoints FAILED [ 81%]
+tests/unit/test_web_api.py::test_serve_command_exists PASSED             [ 84%]
+tests/unit/test_web_api.py::test_convert_market_lowercase PASSED         [ 86%]
+tests/unit/test_web_api.py::test_convert_market_invalid_raises_valueerror PASSED [ 89%]
+tests/unit/test_web_api.py::test_convert_category_from_int_string PASSED [ 92%]
+tests/unit/test_web_api.py::test_convert_category_invalid_raises_valueerror PASSED [ 94%]
+tests/unit/test_web_api.py::test_full_app_routes_registered FAILED       [ 97%]
+tests/unit/test_web_api.py::test_openapi_schema_generated FAILED         [100%]
+
+=================================== FAILURES ===================================
+_____________________________ test_public_exports ______________________________
+tests/unit/test_wencai.py:42: in test_public_exports
+    assert hasattr(wencai, "WencaiStock")
+E   AssertionError: assert False
+E    +  where False = hasattr(<module 'easy_tdx.wencai' from '/Users/a1-6/.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/easy_tdx/wencai/__init__.py'>, 'WencaiStock')
+______________________ test_wencai_stock_dataclass_fields ______________________
+tests/unit/test_wencai.py:56: in test_wencai_stock_dataclass_fields
+    from easy_tdx.wencai import WencaiStock
+E   ImportError: cannot import name 'WencaiStock' from 'easy_tdx.wencai' (/Users/a1-6/.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/easy_tdx/wencai/__init__.py)
+______________________ test_search_missing_cookie_raises _______________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:90: in annotated_getattr
+    obj = getattr(obj, name)
+E   AttributeError: module 'easy_tdx.wencai.client' has no attribute 'get_wencai_cookie'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:70: in test_search_missing_cookie_raises
+    monkeypatch.setattr("easy_tdx.wencai.client.get_wencai_cookie", lambda: "")
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:104: in derive_importpath
+    annotated_getattr(target, attr, ann=module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:92: in annotated_getattr
+    raise AttributeError(
+E   AttributeError: 'module' object at easy_tdx.wencai.client has no attribute 'get_wencai_cookie'
+________________ test_search_uses_env_cookie_and_returns_stocks ________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:77: in resolve
+    __import__(used)
+E   ModuleNotFoundError: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:94: in test_search_uses_env_cookie_and_returns_stocks
+    monkeypatch.setattr("easy_tdx.wencai.client.requests.post", _fake_post)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:102: in derive_importpath
+    target = resolve(module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:83: in resolve
+    raise ImportError(f"import error in {used}: {ex}") from ex
+E   ImportError: import error in easy_tdx.wencai.client.requests: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+_____________ test_search_uses_config_cookie_when_request_missing ______________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:90: in annotated_getattr
+    obj = getattr(obj, name)
+E   AttributeError: module 'easy_tdx.wencai.client' has no attribute 'get_wencai_cookie'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:120: in test_search_uses_config_cookie_when_request_missing
+    monkeypatch.setattr(
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:104: in derive_importpath
+    annotated_getattr(target, attr, ann=module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:92: in annotated_getattr
+    raise AttributeError(
+E   AttributeError: 'module' object at easy_tdx.wencai.client has no attribute 'get_wencai_cookie'
+_____________________ test_search_persists_explicit_cookie _____________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:90: in annotated_getattr
+    obj = getattr(obj, name)
+E   AttributeError: module 'easy_tdx.wencai.client' has no attribute 'get_wencai_cookie'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:140: in test_search_persists_explicit_cookie
+    monkeypatch.setattr("easy_tdx.wencai.client.get_wencai_cookie", lambda: "")
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:104: in derive_importpath
+    annotated_getattr(target, attr, ann=module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:92: in annotated_getattr
+    raise AttributeError(
+E   AttributeError: 'module' object at easy_tdx.wencai.client has no attribute 'get_wencai_cookie'
+__________________________ test_search_empty_results ___________________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:77: in resolve
+    __import__(used)
+E   ModuleNotFoundError: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:163: in test_search_empty_results
+    monkeypatch.setattr("easy_tdx.wencai.client.requests.post", _fake_post)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:102: in derive_importpath
+    target = resolve(module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:83: in resolve
+    raise ImportError(f"import error in {used}: {ex}") from ex
+E   ImportError: import error in easy_tdx.wencai.client.requests: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+_______________________ test_search_skips_invalid_items ________________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:77: in resolve
+    __import__(used)
+E   ModuleNotFoundError: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:183: in test_search_skips_invalid_items
+    monkeypatch.setattr("easy_tdx.wencai.client.requests.post", _fake_post)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:102: in derive_importpath
+    target = resolve(module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:83: in resolve
+    raise ImportError(f"import error in {used}: {ex}") from ex
+E   ImportError: import error in easy_tdx.wencai.client.requests: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+_______________________ test_search_wraps_request_errors _______________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:77: in resolve
+    __import__(used)
+E   ModuleNotFoundError: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:198: in test_search_wraps_request_errors
+    monkeypatch.setattr("easy_tdx.wencai.client.requests.post", _fake_post)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:102: in derive_importpath
+    target = resolve(module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:83: in resolve
+    raise ImportError(f"import error in {used}: {ex}") from ex
+E   ImportError: import error in easy_tdx.wencai.client.requests: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+_____________________ test_search_wraps_json_decode_errors _____________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:77: in resolve
+    __import__(used)
+E   ModuleNotFoundError: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:216: in test_search_wraps_json_decode_errors
+    monkeypatch.setattr("easy_tdx.wencai.client.requests.post", _fake_post)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:102: in derive_importpath
+    target = resolve(module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:83: in resolve
+    raise ImportError(f"import error in {used}: {ex}") from ex
+E   ImportError: import error in easy_tdx.wencai.client.requests: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+____________________ test_search_wraps_invalid_data_format _____________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:77: in resolve
+    __import__(used)
+E   ModuleNotFoundError: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:231: in test_search_wraps_invalid_data_format
+    monkeypatch.setattr("easy_tdx.wencai.client.requests.post", _fake_post)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:102: in derive_importpath
+    target = resolve(module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:83: in resolve
+    raise ImportError(f"import error in {used}: {ex}") from ex
+E   ImportError: import error in easy_tdx.wencai.client.requests: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+__________________________ test_wencai_router_success __________________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:77: in resolve
+    __import__(used)
+E   ModuleNotFoundError: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:261: in test_wencai_router_success
+    monkeypatch.setattr("easy_tdx.wencai.client.requests.post", _fake_post)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:102: in derive_importpath
+    target = resolve(module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:83: in resolve
+    raise ImportError(f"import error in {used}: {ex}") from ex
+E   ImportError: import error in easy_tdx.wencai.client.requests: No module named 'easy_tdx.wencai.client.requests'; 'easy_tdx.wencai.client' is not a package
+________________ test_wencai_router_missing_cookie_returns_503 _________________
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:90: in annotated_getattr
+    obj = getattr(obj, name)
+E   AttributeError: module 'easy_tdx.wencai.client' has no attribute 'get_wencai_cookie'
+
+The above exception was the direct cause of the following exception:
+tests/unit/test_wencai.py:289: in test_wencai_router_missing_cookie_returns_503
+    monkeypatch.setattr("easy_tdx.wencai.client.get_wencai_cookie", lambda: "")
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:104: in derive_importpath
+    annotated_getattr(target, attr, ann=module)
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/monkeypatch.py:92: in annotated_getattr
+    raise AttributeError(
+E   AttributeError: 'module' object at easy_tdx.wencai.client has no attribute 'get_wencai_cookie'
+__________________ test_server_router_wencai_cookie_endpoints __________________
+tests/unit/test_web_api.py:221: in test_server_router_wencai_cookie_endpoints
+    assert "/server/wencai-cookie" in paths
+E   AssertionError: assert '/server/wencai-cookie' in ['/server/hosts', '/server/test', '/server/switch']
+_______________________ test_full_app_routes_registered ________________________
+tests/unit/test_web_api.py:306: in test_full_app_routes_registered
+    assert matched, f"Expected route with prefix '{prefix}' not found in {all_paths}"
+E   AssertionError: Expected route with prefix '/api/v1/server/wencai-cookie' not found in ['/openapi.json', '/docs', '/docs/oauth2-redirect', '/redoc', '/api/v1/security/count', '/api/v1/security/list', '/api/v1/security/list-all', '/api/v1/quotes', '/api/v1/market/stat', '/api/v1/fund-flow', '/api/v1/fund-flow/history', '/api/v1/market/strength', '/api/v1/bars', '/api/v1/bars/index', '/api/v1/minute', '/api/v1/minute/history', '/api/v1/transaction', '/api/v1/transaction/history', '/api/v1/xdxr', '/api/v1/finance', '/api/v1/company/category', '/api/v1/company/content', '/api/v1/financial/file-list', '/api/v1/financial/records', '/api/v1/block', '/api/v1/chanlun/analyze', '/api/v1/ws/realtime/{symbol}', '/api/v1/board-mac/list', '/api/v1/board-mac/members', '/api/v1/board-mac/belong', '/api/v1/board-mac/summary', '/api/v1/board-mac/ranking', '/api/v1/board-mac/change-ranking', '/api/v1/mac/capital-flow', '/api/v1/mac/symbol-info', '/api/v1/mac/server-info', '/api/v1/mac/quote-list', '/api/v1/mac/auction', '/api/v1/mac/unusual', '/api/v1/ex/bars', '/api/v1/ex/quote', '/api/v1/ex/minute', '/api/v1/ex/transaction', '/api/v1/indicator/list', '/api/v1/indicator/compute', '/api/v1/announcements', '/api/v1/sina/financial-report', '/api/v1/wencai/search', '/api/v1/backtest/strategies', '/api/v1/backtest/run', '/api/v1/backtest/run/async', '/api/v1/backtest/tasks', '/api/v1/backtest/tasks/{task_id}', '/api/v1/backtest/portfolio/run/async', '/api/v1/backtest/multi-strategy/run/async', '/api/v1/backtest/optimize/run/async', '/api/v1/backtest/optimize-all/run/async', '/api/v1/strategies', '/api/v1/strategies/{strategy_id}', '/api/v1/strategies', '/api/v1/strategies/{strategy_id}', '/api/v1/server/hosts', '/api/v1/server/test', '/api/v1/server/switch', '']
+E   assert False
+________________________ test_openapi_schema_generated _________________________
+tests/unit/test_web_api.py:325: in test_openapi_schema_generated
+    assert "/api/v1/server/wencai-cookie" in schema["paths"]
+E   AssertionError: assert '/api/v1/server/wencai-cookie' in {'/api/v1/announcements': {'get': {'description': '检索公司公告列表（巨潮资讯网，独立于 TDX 行情服务器）。\n\nTDX 行情不可用时本接口仍可调用。', 'operationId': 'announcements_api_v1_announcements_get', 'parameters': [{'description': '6位股票代码', 'in': 'query', 'name': 'code', 'required': True, ...}, {'description': '每页数量', 'in': 'query', 'name': 'count', 'required': False, ...}, {'description': '页码（1 起始）', 'in': 'query', 'name': 'page', 'required': False, ...}], 'responses': {'200': {'content': {'application/json': {...}}, 'description': 'Successful Response'}, '422': {'content': {'application/json': {...}}, 'description': 'Validation Error'}}, ...}}, '/api/v1/backtest/multi-strategy/run/async': {'post': {'description': '提交多策略组合回测后台任务（资金分仓 / 并行制）。\n\n勾选 N 个策略，各自在原标的（取最新行情）上独立回测，各拿总资金 1/N。\n单个策略取数失败则跳过（不中断整组），全部失败返回 400。结果为\nMultiStrategyResult（结构同 PortfolioResult），通过 GET /backtest/tasks/{task_id} 轮询。', 'operationId': 'run_multi_strategy_backtest_async_api_v1_backtest_multi_strategy_run_async_post', 'requestBody': {'content': {'application/json': {'schema': {...}}}, 'required': True}, 'responses': {'202': {'content': {'application/json': {...}}, 'description': 'Successful Response'}, '422': {'content': {'application/json': {...}}, 'description': 'Validation Error'}}, ...}}, '/api/v1/backtest/optimize-all/run/async': {'post': {'description': '提交「一键寻优所有策略」后台任务。\n\n在单个标的上，对所有策略的预设参数网格（见 presets.STRATEGY_PRESETS）依次\n做网格寻优，取各策略最优点汇总成全局排名。数据获取支持内联 ohlcv 或按\nsymbol 取行情。通过 GET /backtest/tasks/{task_id} 轮询结果。', 'operationId': 'run_optimize_all_async_api_v1_backtest_optimize_all_run_async_post', 'requestBody': {'content': {'application/json': {'schema': {...}}}, 'required': True}, 'responses': {'202': {'content': {'application/json': {...}}, 'description': 'Successful Response'}, '422': {'content': {'application/json': {...}}, 'description': 'Validation Error'}}, ...}}, '/api/v1/backtest/optimize/run/async': {'post': {'description': '提交参数网格寻优后台任务。\n\n在单个标的上对策略参数做网格搜索。数据获取支持内联 ohlcv 或按 symbol 取行情。\n通过 GET /backtest/tasks/{task_id} 轮询结果。', 'operationId': 'run_optimize_async_api_v1_backtest_optimize_run_async_post', 'requestBody': {'content': {'application/json': {'schema': {...}}}, 'required': True}, 'responses': {'202': {'content': {'application/json': {...}}, 'description': 'Successful Response'}, '422': {'content': {'application/json': {...}}, 'description': 'Validation Error'}}, ...}}, ...}
+=============================== warnings summary ===============================
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/config/__init__.py:1441
+  /Users/a1-6/.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/config/__init__.py:1441: PytestConfigWarning: Unknown config option: asyncio_mode
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/unit/test_wencai.py::test_public_exports - AssertionError: asser...
+FAILED tests/unit/test_wencai.py::test_wencai_stock_dataclass_fields - Import...
+FAILED tests/unit/test_wencai.py::test_search_missing_cookie_raises - Attribu...
+FAILED tests/unit/test_wencai.py::test_search_uses_env_cookie_and_returns_stocks
+FAILED tests/unit/test_wencai.py::test_search_uses_config_cookie_when_request_missing
+FAILED tests/unit/test_wencai.py::test_search_persists_explicit_cookie - Attr...
+FAILED tests/unit/test_wencai.py::test_search_empty_results - ImportError: im...
+FAILED tests/unit/test_wencai.py::test_search_skips_invalid_items - ImportErr...
+FAILED tests/unit/test_wencai.py::test_search_wraps_request_errors - ImportEr...
+FAILED tests/unit/test_wencai.py::test_search_wraps_json_decode_errors - Impo...
+FAILED tests/unit/test_wencai.py::test_search_wraps_invalid_data_format - Imp...
+FAILED tests/unit/test_wencai.py::test_wencai_router_success - ImportError: i...
+FAILED tests/unit/test_wencai.py::test_wencai_router_missing_cookie_returns_503
+FAILED tests/unit/test_web_api.py::test_server_router_wencai_cookie_endpoints
+FAILED tests/unit/test_web_api.py::test_full_app_routes_registered - Assertio...
+FAILED tests/unit/test_web_api.py::test_openapi_schema_generated - AssertionE...
+=================== 16 failed, 22 passed, 1 warning in 1.11s ===================
