@@ -3,7 +3,7 @@
 // 编排：点击「开始回测」→ 自动取行情 → 回测 → 展示 K线+净值+指标+成交。
 // 取行情已整合进「开始回测」（不再有单独的取行情按钮）。
 
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import EquityChart from '../components/EquityChart.vue'
@@ -44,6 +44,9 @@ const cash = ref(1000000)
 const commission = ref(0.0003)
 const slippage = ref(0)
 const execution = ref<ExecutionMode>('next_open')
+// 持仓模式与预热 bar 数：由策略 schema 自动配置（shadow_yang 声明 fixed + warmup=5）
+const positionMode = ref<'full' | 'fixed'>('full')
+const warmupBars = ref(0)
 
 // 成交价模式（精简为 开盘价/收盘价）
 const EXECUTIONS: { value: ExecutionMode; label: string }[] = [
@@ -99,6 +102,8 @@ async function onRun() {
     commission: commission.value,
     slippage: slippage.value,
     execution: execution.value,
+    position_mode: positionMode.value,
+    warmup_bars: warmupBars.value,
   })
 }
 
@@ -113,6 +118,18 @@ const saveMsg = ref('') // 保存后提示（成功/失败）
 const strategyLabel = computed(
   () => store.strategies.find((s) => s.name === strategy.value)?.label ?? strategy.value,
 )
+
+// 当前策略 schema（用于读取 position_mode/warmup_bars 等元数据）
+const selectedSchema = computed(
+  () => store.strategies.find((s) => s.name === strategy.value) ?? null,
+)
+
+// 策略切换时自动配置持仓模式与预热 bar 数（策略声明的元数据优先）
+watch(selectedSchema, (schema) => {
+  if (!schema) return
+  positionMode.value = (schema.position_mode as 'full' | 'fixed') ?? 'full'
+  warmupBars.value = schema.warmup_bars ?? 0
+})
 
 // 评级：基于完整 Performance，6 维度评分 + 一票否决。
 // total_return 不直接计入评分（只通过卡玛/夏普间接体现），
@@ -160,6 +177,8 @@ async function onSave() {
         stamp_tax: 0.001,
         slippage: slippage.value,
         execution: execution.value,
+        position_mode: positionMode.value,
+        warmup_bars: warmupBars.value,
       },
       snapshot: {
         total_return: store.result.performance.total_return,

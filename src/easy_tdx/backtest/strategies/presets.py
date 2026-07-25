@@ -98,6 +98,15 @@ STRATEGY_PRESETS: dict[str, dict[str, list[Any]]] = {
         # capital 仅作粗档扫描（1千万/1亿/10亿股），覆盖小盘→大盘
         "capital": [1e7, 1e8, 1e9, 1e10],
     },  # 4
+    # ── 影线后收阳线 ─────────────────────────────────────────────────────────
+    "shadow_yang": {
+        "low_open_pct": [0.95, 0.98, 0.99],
+        "upper_shadow_ratio": [0.5, 1.0, 2.0],
+        "ma_long_period": [20, 30],
+        "ma_stop_period": [10, 15],
+        "ma_very_long_period": [60, 120],
+        "bullish_ma5_deviation": [0.005, 0.02],
+    },  # 3*3*2*2*2*2 = 144
 }
 
 

@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import math
+
 from easy_tdx.backtest.strategies.registry import (
     Param,
     ParametrizedStrategy,
@@ -588,3 +590,290 @@ class FslStrategy(ParametrizedStrategy):
             self.buy()
         elif self.dead[i] and self.position["size"] > 0:
             self.sell()
+
+
+# ── 影线后收阳线 ─────────────────────────────────────────────────────────────
+
+
+@register_strategy(
+    name="shadow_yang",
+    label="影线后收阳线",
+    description="阳线+MA上行+收盘价>前日最低价+前日阴线无长上影 以收盘价买入。"
+    "非多头排列：低开2%或收阴线全卖，买入后第一日收盘下跌则清仓，否则卖一半。"
+    "多头排列(MA5>MA10>MA20>MA60且四线斜率>5°)：MA5斜率<45°跌破10日线止损，"
+    ">=45°跌破5日线止损。需 fixed 持仓模式支持部分卖出。",
+)
+class ShadowYangStrategy(ParametrizedStrategy):
+    """影线后收阳线策略（状态机：WAITING -> HOLDING_FULL -> HOLDING_HALF）。
+
+    买入条件（四条件全部满足）：
+      1. 当天收阳线（close > open）
+      2. MA(price_ma_period) 斜率大于 0（均线上行）
+      3. 当天收盘价 > 前日最低价（close > prev_low）
+      4. 前一天阴线无长上影线（上影 > 实体 × upper_shadow_ratio 则排除）
+
+    以当天收盘价限价买入。
+
+    卖出规则（持仓后逐日检查）：
+      - 非均线多头排列：现有卖出逻辑（优先级从高到低）：
+          * 低开（开盘价 <= 前日收盘价 * low_open_pct）：以开盘价全部卖出
+          * 收阴线（close < open）：以收盘价全部卖出
+          * 买入后第一日收盘下跌（close < 前日收盘价）：以收盘价全部清仓
+          * 其余情况：
+              - 买入后第一日：以收盘价卖出一半
+              - 后续交易日：持有，直到出现阴线或低开时全部卖出
+      - 均线多头排列（MA5 > MA20 > MA60、MA10 > MA20 > MA60 且四线斜率角度
+        均 > bullish_slope_min；MA5 若低于 MA10 偏离不超过
+        bullish_ma5_deviation）：
+        均线止损逻辑：
+          * MA(price_ma_period) 斜率角度 < slope_threshold（缓涨）：
+            收盘价跌破 ma_stop_period 日均线止损
+          * MA(price_ma_period) 斜率角度 >= slope_threshold（急涨）：
+            收盘价跌破 price_ma_period 日均线止损
+
+    注意：
+      - 使用限价单（``price=`` 参数）在信号当根 K 线成交。
+      - 部分卖出需要 ``position_mode="fixed"``，通过类属性
+        ``required_position_mode`` 声明，路由层自动传递给引擎。
+    """
+
+    # 引擎级需求（注册表自动读取）
+    required_position_mode = "fixed"
+    default_warmup_bars = 60
+
+    params = [
+        Param("price_ma_period", int, default=5, min_value=2, max_value=20, label="价格均线周期"),
+        Param(
+            "low_open_pct",
+            float,
+            default=0.98,
+            min_value=0.90,
+            max_value=1.00,
+            label="低开阈值",
+            description="开盘价 <= 前收 × 此阈值视为低开（0.98=低开2%）",
+        ),
+        Param(
+            "upper_shadow_ratio",
+            float,
+            default=1.0,
+            min_value=0.5,
+            max_value=5.0,
+            label="长上影倍数",
+            description="前一天阴线上影 > 实体 × 此倍数则不买入（1.0=上影超过实体）",
+        ),
+        Param("ma_long_period", int, default=20, min_value=5, max_value=60, label="趋势均线周期"),
+        Param(
+            "ma_stop_period",
+            int,
+            default=10,
+            min_value=5,
+            max_value=30,
+            label="缓涨止损均线周期",
+        ),
+        Param(
+            "slope_threshold",
+            float,
+            default=45.0,
+            min_value=0.0,
+            max_value=89.0,
+            label="MA斜率角度阈值",
+            description="MA5 斜率角度阈值（度），< 阈值用长均线止损，>= 阈值用短均线止损",
+        ),
+        Param(
+            "ma_very_long_period",
+            int,
+            default=60,
+            min_value=20,
+            max_value=120,
+            label="多头排列长均线周期",
+        ),
+        Param(
+            "bullish_slope_min",
+            float,
+            default=5.0,
+            min_value=0.0,
+            max_value=30.0,
+            label="多头排列斜率最小角度",
+            description="均线多头排列要求四条均线斜率角度均 > 此值（度）",
+        ),
+        Param(
+            "bullish_ma5_deviation",
+            float,
+            default=0.01,
+            min_value=0.0,
+            max_value=0.05,
+            label="MA5偏离MA10最大比例",
+            description="MA5 低于 MA10 的最大允许偏离比例（0.01=1%）",
+        ),
+    ]
+
+    # 状态枚举（字符串常量，避免 enum 开销）
+    _WAITING = "WAITING"
+    _HOLDING_FULL = "HOLDING_FULL"
+    _HOLDING_HALF = "HOLDING_HALF"
+
+    def init(self) -> None:
+        self.ma = self.I(MA, self.data.close, self.p["price_ma_period"])
+        self.ma10 = self.I(MA, self.data.close, self.p["ma_stop_period"])
+        self.ma20 = self.I(MA, self.data.close, self.p["ma_long_period"])
+        self.ma60 = self.I(MA, self.data.close, self.p["ma_very_long_period"])
+        self._state: str = self._WAITING
+
+    def next(self) -> None:
+        cur_close = self.data.close[0]
+        cur_open = self.data.open[0]
+        prev_close = self.data.close[-1]
+        i = self._bar_index
+
+        # ── 空仓：寻找买入信号 ───────────────────────────────────────────────
+        if self._state == self._WAITING:
+            is_yang = cur_close > cur_open
+            # MA 斜率：当前 MA > 前一根 MA（NaN 比较为 False，自然跳过预热期）
+            ma_now = self.ma[i]
+            ma_prev = self.ma[i - 1] if i > 0 else float("nan")
+            is_ma_up = ma_now > ma_prev
+
+            # 收盘价必须大于前日最低价（NaN 比较为 False，自然跳过首根 K 线）
+            prev_low = self.data.low[-1]
+            is_close_above_prev_low = cur_close > prev_low
+
+            # 前一天阴线不能有长上影线（上影 > 实体 × upper_shadow_ratio 则排除）
+            prev_open = self.data.open[-1]
+            prev_high = self.data.high[-1]
+            is_prev_no_long_upper_shadow = not self._is_long_upper_shadow_yin(
+                prev_open, prev_high, prev_close, self.p["upper_shadow_ratio"]
+            )
+
+            if (
+                is_yang
+                and is_ma_up
+                and is_close_above_prev_low
+                and is_prev_no_long_upper_shadow
+            ):
+                self.buy(size=0, price=cur_close)
+                self._state = self._HOLDING_FULL
+            return
+
+        # ── 持仓：检查卖出条件 ──────────────────────────────────────────────
+        is_bullish = self._is_ma_bullish(i)
+
+        if is_bullish:
+            # 均线多头排列：均线止损逻辑
+            ma_now = self.ma[i]
+            ma_prev = self.ma[i - 1] if i > 0 else float("nan")
+            angle = self._calc_ma_angle(ma_now, ma_prev)
+
+            if angle < self.p["slope_threshold"]:
+                # MA5 斜率 < 阈值（缓涨）：收盘价跌破 10 日均线止损
+                stop_ma = self.ma10[i]
+            else:
+                # MA5 斜率 >= 阈值（急涨）：收盘价跌破 5 日均线止损
+                stop_ma = self.ma[i]
+
+            if cur_close < stop_ma:
+                self.sell(size=0, price=cur_close)
+                self._state = self._WAITING
+        else:
+            # 非均线多头排列：现有卖出逻辑（优先级：低开 > 阴线 > 其余）
+            is_low_open = self._is_low_open(cur_open, prev_close, self.p["low_open_pct"])
+            is_yin = cur_close < cur_open
+
+            if is_low_open:
+                self.sell(size=0, price=cur_open)
+                self._state = self._WAITING
+            elif is_yin:
+                self.sell(size=0, price=cur_close)
+                self._state = self._WAITING
+            elif self._state == self._HOLDING_FULL:
+                if cur_close < prev_close:
+                    # 买入后第一日收盘下跌：以收盘价全部清仓
+                    self.sell(size=0, price=cur_close)
+                    self._state = self._WAITING
+                else:
+                    # 以收盘价卖一半（向下取整到 100 股整手）
+                    position_size = self.position["size"]
+                    half = int(position_size / 2 / 100) * 100
+                    if half > 0:
+                        self.sell(size=half, price=cur_close)
+                    self._state = self._HOLDING_HALF
+            # HOLDING_HALF + 其余情况：持有，不做操作
+
+    @staticmethod
+    def _is_low_open(cur_open: float, prev_close: float, threshold: float) -> bool:
+        """判断是否低开（开盘价 <= 前日收盘价 × 阈值）。
+
+        NaN 检查：``prev_close == prev_close`` 对 NaN 返回 False。
+        """
+        if not (prev_close == prev_close and prev_close > 0):
+            return False
+        return cur_open <= prev_close * threshold
+
+    @staticmethod
+    def _is_long_upper_shadow_yin(
+        prev_open: float, prev_high: float, prev_close: float, ratio: float
+    ) -> bool:
+        """判断前一天阴线是否有长上影线（上影 > 实体 × ratio）。
+
+        仅当 prev_close < prev_open（阴线）时判断；阳线返回 False（放行）。
+        NaN 输入返回 False。
+        """
+        if not (prev_open == prev_open and prev_high == prev_high and prev_close == prev_close):
+            return False
+        if prev_close >= prev_open:
+            return False
+        body = prev_open - prev_close
+        upper_shadow = prev_high - prev_open
+        return upper_shadow > body * ratio
+
+    def _is_ma_bullish(self, i: int) -> bool:
+        """判断是否为均线多头排列。
+
+        条件：
+          1. MA5 > MA20 > MA60 且 MA10 > MA20 > MA60（多头排列）；
+             MA5 若低于 MA10，偏离不超过 bullish_ma5_deviation
+          2. MA5/MA10/MA20/MA60 斜率角度均 > bullish_slope_min（均线上行）
+
+        NaN 值时比较返回 False，自然跳过预热期。
+        """
+        if i < 1:
+            return False
+
+        ma5 = self.ma[i]
+        ma10 = self.ma10[i]
+        ma20 = self.ma20[i]
+        ma60 = self.ma60[i]
+
+        # 多头排列：MA5 > MA20 > MA60 且 MA10 > MA20 > MA60
+        if not (ma5 > ma20 > ma60 and ma10 > ma20 > ma60):
+            return False
+
+        # MA5 若低于 MA10，偏离不超过 bullish_ma5_deviation
+        deviation = self.p["bullish_ma5_deviation"]
+        if ma5 < ma10 and ma5 < ma10 * (1 - deviation):
+            return False
+
+        # 四条均线斜率角度均 > 阈值
+        slope_min = self.p["bullish_slope_min"]
+        for ma_now, ma_prev in (
+            (self.ma[i], self.ma[i - 1]),
+            (self.ma10[i], self.ma10[i - 1]),
+            (self.ma20[i], self.ma20[i - 1]),
+            (self.ma60[i], self.ma60[i - 1]),
+        ):
+            if self._calc_ma_angle(ma_now, ma_prev) <= slope_min:
+                return False
+
+        return True
+
+    @staticmethod
+    def _calc_ma_angle(ma_now: float, ma_prev: float) -> float:
+        """计算均线斜率角度（TDX 公式）。
+
+        angle = atan((ma_now - ma_prev) / ma_prev * 100) * 180 / π
+
+        1% 日变化率对应 45°。NaN 或除零返回 0.0（视为平缓）。
+        """
+        if ma_now != ma_now or ma_prev != ma_prev or ma_prev <= 0:
+            return 0.0
+        pct_change = (ma_now - ma_prev) / ma_prev * 100
+        return math.degrees(math.atan(pct_change))

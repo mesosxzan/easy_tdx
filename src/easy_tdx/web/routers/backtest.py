@@ -312,6 +312,12 @@ def _run_backtest(df: pd.DataFrame, req: BacktestRequest) -> dict[str, Any]:
         raise ValueError(str(exc)) from exc
     strategy = entry.build(req.params)
 
+    # 持仓模式与预热 bar 数：策略声明的元数据优先于请求默认值。
+    # shadow_yang 等策略通过 required_position_mode="fixed" 声明需要部分卖出，
+    # 路由层自动读取并传给引擎，前端无需手动选择。
+    position_mode = entry.position_mode or req.position_mode
+    warmup_bars = entry.warmup_bars or req.warmup_bars
+
     engine = BacktestEngine(
         strategy=strategy,
         cash=req.cash,
@@ -320,6 +326,8 @@ def _run_backtest(df: pd.DataFrame, req: BacktestRequest) -> dict[str, Any]:
         stamp_tax=req.stamp_tax,
         slippage=req.slippage,
         execution=req.execution,
+        position_mode=position_mode,
+        warmup_bars=warmup_bars,
     )
     result = engine.run(df)
     return serialize_result(result)

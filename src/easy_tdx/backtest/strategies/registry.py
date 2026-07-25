@@ -215,26 +215,46 @@ class ParametrizedStrategy(Strategy):
 
 @dataclass
 class RegisteredStrategy:
-    """注册表条目。"""
+    """注册表条目。
+
+    Attributes:
+        name: 策略名（注册 key）。
+        label: 前端展示名。
+        description: 策略描述。
+        strategy_cls: 策略类。
+        params: 参数 schema 列表。
+        position_mode: 策略要求的持仓模式（None=不指定，用引擎默认 "full"；
+            "fixed"=支持部分卖出）。由策略类的 ``required_position_mode``
+            类属性声明，路由层自动读取并传给引擎。
+        warmup_bars: 策略推荐的预热 bar 数（0=不需要）。由策略类的
+            ``default_warmup_bars`` 类属性声明。
+    """
 
     name: str
     label: str
     description: str
     strategy_cls: type[ParametrizedStrategy]
     params: list[Param] = field(default_factory=list)
+    position_mode: str | None = None
+    warmup_bars: int = 0
 
     def to_schema(self) -> dict[str, Any]:
         """序列化为 JSON 兼容的策略描述（供前端策略下拉框 + 参数表单）。"""
         # 延迟导入避免 presets ↔ registry 循环依赖
         from easy_tdx.backtest.strategies.presets import get_preset
 
-        return {
+        schema: dict[str, Any] = {
             "name": self.name,
             "label": self.label,
             "description": self.description,
             "params": [p.to_schema() for p in self.params],
             "preset_grid": get_preset(self.name),
         }
+        if self.position_mode is not None:
+            schema["position_mode"] = self.position_mode
+        if self.warmup_bars > 0:
+            schema["warmup_bars"] = self.warmup_bars
+        return schema
 
     def build(
         self,
@@ -263,16 +283,26 @@ class StrategyRegistry:
         label: str = "",
         description: str = "",
     ) -> type[ParametrizedStrategy]:
-        """登记一个策略类。重复 name 抛 ValueError。"""
+        """登记一个策略类。重复 name 抛 ValueError。
+
+        策略类可通过类属性声明引擎级需求：
+        - ``required_position_mode``: 持仓模式（如 "fixed" 支持部分卖出）
+        - ``default_warmup_bars``: 预热 bar 数（指标 NaN 期过滤）
+        两者均为可选，缺省时 None/0（不影响其他策略）。
+        """
         if name in self._strategies:
             raise ValueError(f"策略名 '{name}' 已注册")
         params = list(getattr(strategy_cls, "params", []))
+        position_mode = getattr(strategy_cls, "required_position_mode", None)
+        warmup_bars = getattr(strategy_cls, "default_warmup_bars", 0)
         self._strategies[name] = RegisteredStrategy(
             name=name,
             label=label or name,
             description=description,
             strategy_cls=strategy_cls,
             params=params,
+            position_mode=position_mode,
+            warmup_bars=warmup_bars,
         )
         return strategy_cls
 

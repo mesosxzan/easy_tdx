@@ -23,6 +23,10 @@ export interface StrategySchema {
   description: string
   params: ParamSchema[]
   preset_grid?: Record<string, Array<number | string>>
+  /** 策略要求的持仓模式（如 "fixed" 支持部分卖出）；未声明则用引擎默认 "full" */
+  position_mode?: string
+  /** 策略推荐的预热 bar 数；未声明则 0 */
+  warmup_bars?: number
 }
 
 export interface StrategiesResponse {
@@ -83,6 +87,8 @@ export interface BacktestRequest {
   stamp_tax?: number
   slippage?: number
   execution?: ExecutionMode
+  position_mode?: 'full' | 'fixed'
+  warmup_bars?: number
   ohlcv?: Bar[]
   symbol?: string
   category?: Category

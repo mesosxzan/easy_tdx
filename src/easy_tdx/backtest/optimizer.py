@@ -191,6 +191,8 @@ class ParamGridOptimizer:
                     stamp_tax=self._stamp_tax,
                     slippage=self._slippage,
                     execution=self._execution,
+                    position_mode=entry.position_mode or "full",
+                    warmup_bars=entry.warmup_bars,
                 )
                 bt_result: BacktestResult = engine.run(self._df)
                 perf = bt_result.performance

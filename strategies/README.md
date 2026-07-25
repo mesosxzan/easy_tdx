@@ -10,6 +10,12 @@ easy-tdx backtest SZ 000001 --strategy-file strategies/ma_cross.py --table
 easy-tdx backtest SH 600519 --strategy-file strategies/macd_cross.py --cash 50000 --table
 ```
 
+> **位置模式**：默认 `--position-mode full`（满仓买入/清仓卖出）。使用 `shadow_yang.py` 等部分卖出策略时需指定 `--position-mode fixed`：
+
+```bash
+easy-tdx backtest SZ 000001 --strategy-file strategies/shadow_yang.py --position-mode fixed --table
+```
+
 ## 策略列表
 
 | 文件 | 策略 | 类型 | 适合行情 |
@@ -24,6 +30,7 @@ easy-tdx backtest SH 600519 --strategy-file strategies/macd_cross.py --cash 5000
 | `bias_reversal.py` | 乖离率反转 | 反转 | 震荡回归 |
 | `volume_price.py` | 量价配合 | 综合判断 | 放量突破 |
 | `obv_trend.py` | OBV 能量潮趋势 | 量价趋势 | 资金持续流入的上升趋势 |
+| `shadow_yang.py` | 影线后收阳线（限价单+部分卖出） | 量价配合 | 放量阳线后短线交易 |
 
 ## 编写自定义策略
 

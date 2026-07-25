@@ -51,6 +51,16 @@ class BacktestRequest(BaseModel):
     execution: Literal["next_open", "next_close"] = Field(
         default="next_open", description="成交模式"
     )
+    position_mode: Literal["full", "fixed"] = Field(
+        default="full",
+        description="持仓模式：full=满仓买入/清仓卖出；fixed=支持部分卖出（sell(size=N)）",
+    )
+    warmup_bars: int = Field(
+        default=0,
+        ge=0,
+        le=500,
+        description="指标预热 bar 数（前 N 根不调用 next/不产生信号）",
+    )
 
     # 数据来源 A：内联 OHLCV（上限与 symbol 路径的 count 上限对齐，防 DoS）
     ohlcv: list[dict[str, Any]] | None = Field(

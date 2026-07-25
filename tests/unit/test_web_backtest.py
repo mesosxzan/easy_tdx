@@ -149,6 +149,94 @@ def test_param_choices_validation():
 
 
 # ---------------------------------------------------------------------------
+# shadow_yang 策略：position_mode / warmup_bars 元数据 + 部分卖出
+# ---------------------------------------------------------------------------
+
+
+def test_shadow_yang_registered():
+    """shadow_yang 应已注册到注册表。"""
+    from easy_tdx.backtest.strategies import get_registry
+
+    entry = get_registry().get("shadow_yang")
+    assert entry.name == "shadow_yang"
+    assert entry.label == "影线后收阳线"
+    assert isinstance(entry.description, str) and len(entry.description) > 0
+
+
+def test_shadow_yang_position_mode_and_warmup_bars():
+    """shadow_yang 应声明 position_mode=fixed、warmup_bars=60。"""
+    from easy_tdx.backtest.strategies import get_registry
+
+    entry = get_registry().get("shadow_yang")
+    assert entry.position_mode == "fixed"
+    assert entry.warmup_bars == 60
+
+
+def test_shadow_yang_schema_includes_metadata():
+    """to_schema() 应输出 position_mode 和 warmup_bars。"""
+    from easy_tdx.backtest.strategies import get_registry
+
+    schema = get_registry().get("shadow_yang").to_schema()
+    assert schema["position_mode"] == "fixed"
+    assert schema["warmup_bars"] == 60
+    # 参数列表
+    param_names = [p["name"] for p in schema["params"]]
+    assert "price_ma_period" in param_names
+    assert "low_open_pct" in param_names
+    assert "upper_shadow_ratio" in param_names
+    assert "ma_long_period" in param_names
+    assert "ma_stop_period" in param_names
+    assert "slope_threshold" in param_names
+    assert "ma_very_long_period" in param_names
+    assert "bullish_slope_min" in param_names
+    assert "bullish_ma5_deviation" in param_names
+    # preset_grid
+    assert "shadow_yang" == schema.get("name")
+    assert isinstance(schema.get("preset_grid"), dict)
+    assert len(schema["preset_grid"]) > 0
+
+
+def test_shadow_yang_build_with_defaults():
+    """无参数构造应使用默认值。"""
+    from easy_tdx.backtest.strategies import get_registry
+
+    inst = get_registry().get("shadow_yang").build()
+    assert inst.p["price_ma_period"] == 5
+    assert inst.p["low_open_pct"] == 0.98
+    assert inst.p["upper_shadow_ratio"] == 1.0
+    assert inst.p["ma_long_period"] == 20
+    assert inst.p["ma_stop_period"] == 10
+    assert inst.p["slope_threshold"] == 45.0
+    assert inst.p["ma_very_long_period"] == 60
+    assert inst.p["bullish_slope_min"] == 5.0
+    assert inst.p["bullish_ma5_deviation"] == 0.01
+
+
+def test_shadow_yang_backtest_runs_with_fixed_mode(client, sample_ohlcv):
+    """shadow_yang 在 fixed 持仓模式下端到端回测应成功返回完整结果。
+
+    验证：路由层自动从注册表读取 position_mode=fixed / warmup_bars=60
+    传给引擎，策略的「卖一半」逻辑不会因 full 模式报错。
+    """
+    resp = client.post(
+        "/api/v1/backtest/run",
+        json={
+            "strategy": "shadow_yang",
+            "cash": 100000,
+            "ohlcv": sample_ohlcv,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "performance" in body
+    assert "equity_curve" in body
+    assert "trades" in body
+    assert len(body["equity_curve"]) > 0
+    # config 应记录 position_mode=fixed
+    assert body["config"].get("position_mode") == "fixed"
+
+
+# ---------------------------------------------------------------------------
 # 请求模型校验
 # ---------------------------------------------------------------------------
 

@@ -201,7 +201,7 @@ def _print_ranking(
 
         if not bt.trades.empty:
             click.echo("=== 最近交易记录 ===")
-            recent_trades = bt.trades.tail(10)
+            recent_trades = bt.trades
             for _, trade in recent_trades.iterrows():
                 direction = "买入" if trade["direction"] == "BUY" else "卖出"
                 status = "拒绝" if trade["rejected"] else "成交"

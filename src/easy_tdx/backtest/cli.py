@@ -35,6 +35,20 @@ import click
     type=click.Choice(["next_open", "next_close"]),
     help="成交价规则",
 )
+@click.option(
+    "--position-mode",
+    "position_mode",
+    default="full",
+    type=click.Choice(["full", "fixed", "percent"], case_sensitive=False),
+    help="仓位模式：full=全仓 / fixed=指定股数 / percent=百分比（默认 full）",
+)
+@click.option(
+    "--warmup-bars",
+    "warmup_bars",
+    default=0,
+    type=int,
+    help="指标预热 bar 数，前 N 根不产生信号（默认 0）",
+)
 @click.option("--period", default="DAILY", help="K线周期")
 @click.option("--adjust", default="NONE", help="复权: NONE/QFQ/HFQ")
 @click.option("--count", default=500, type=int, help="K线数量")
@@ -57,6 +71,8 @@ def backtest(
     cash: float,
     commission: float,
     execution: str,
+    position_mode: str,
+    warmup_bars: int,
     period: str,
     adjust: str,
     count: int,
@@ -137,6 +153,8 @@ def backtest(
             cash=cash,
             commission=commission,
             execution=execution,
+            position_mode=position_mode,
+            warmup_bars=warmup_bars,
             chanlun_level=chanlun_level,
         )
         result = engine.run(df)
@@ -274,7 +292,7 @@ def _print_table(result: Any) -> None:
 
     if not result.trades.empty:
         click.echo("=== 最近交易记录 ===")
-        recent_trades = result.trades.tail(10)
+        recent_trades = result.trades
         for idx, trade in recent_trades.iterrows():
             direction = "买入" if trade["direction"] == "BUY" else "卖出"
             status = "拒绝" if trade["rejected"] else "成交"
