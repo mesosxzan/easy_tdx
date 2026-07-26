@@ -205,10 +205,12 @@ def _print_ranking(
             for _, trade in recent_trades.iterrows():
                 direction = "买入" if trade["direction"] == "BUY" else "卖出"
                 status = "拒绝" if trade["rejected"] else "成交"
+                reason = trade.get("reason", "")
+                reason_str = f" {reason}" if reason else ""
                 click.echo(
                     f"  [{trade['datetime']}] {direction} "
                     f"数量={trade['size']:.0f} 价格={trade['price']:.2f} "
-                    f"盈亏={trade['pnl']:.2f} [{status}]"
+                    f"盈亏={trade['pnl']:.2f} [{status}]{reason_str}"
                 )
         else:
             click.echo("无交易记录")

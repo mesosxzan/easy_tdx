@@ -22,8 +22,6 @@ import type {
   TaskState,
   TaskSubmitResponse,
   WencaiSearchRequest,
-  WencaiSearchResponse,
-  WencaiStockItem,
   WencaiCookieResponse,
 } from './types'
 
@@ -112,19 +110,20 @@ export async function fetchBars(
 /** 问财语义搜索（默认用于 A 股选股结果）。 */
 export async function fetchWencaiSearch(
   req: WencaiSearchRequest,
-): Promise<WencaiStockItem[]> {
+): Promise<Record<string, unknown>[]> {
   const { cookie: reqCookie, ...rest } = req
   const resp = await fetch(`${BASE}/wencai/search`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      perpage: 100,
+      query_type: 'stock',
+      perpage: 30,
       cookie: reqCookie?.trim() || undefined,
       ...rest,
     }),
   })
   if (!resp.ok) await throwError(resp)
-  const body = (await resp.json()) as WencaiSearchResponse
+  const body = (await resp.json()) as { data: Record<string, unknown>[]; count: number }
   return body.data
 }
 

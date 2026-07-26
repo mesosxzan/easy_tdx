@@ -298,6 +298,7 @@ class Strategy(ABC):
         price: float | None = None,
         stop_loss: float | None = None,
         take_profit: float | None = None,
+        reason: str = "",
     ) -> None:
         """生成买入信号。
 
@@ -306,6 +307,7 @@ class Strategy(ABC):
             price: 限价（None = 市价单）
             stop_loss: 止损价（None = 不设置）
             take_profit: 止盈价（None = 不设置）
+            reason: 买入说明（可选，用于交易记录展示）
         """
         if self._data_proxy is None:
             raise RuntimeError("策略未绑定数据，请先调用 _bind_data()")
@@ -319,6 +321,7 @@ class Strategy(ABC):
             price=price,
             stop_loss=stop_loss,
             take_profit=take_profit,
+            reason=reason,
         )
         self._signals.append(signal)
 
@@ -328,6 +331,7 @@ class Strategy(ABC):
         price: float | None = None,
         stop_loss: float | None = None,
         take_profit: float | None = None,
+        reason: str = "",
     ) -> None:
         """生成卖出信号。
 
@@ -336,6 +340,7 @@ class Strategy(ABC):
             price: 限价（None = 市价单）
             stop_loss: 止损价（None = 不设置）
             take_profit: 止盈价（None = 不设置）
+            reason: 卖出说明（可选，用于交易记录展示）
         """
         if self._data_proxy is None:
             raise RuntimeError("策略未绑定数据，请先调用 _bind_data()")
@@ -349,6 +354,7 @@ class Strategy(ABC):
             price=price,
             stop_loss=stop_loss,
             take_profit=take_profit,
+            reason=reason,
         )
         self._signals.append(signal)
 

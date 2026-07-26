@@ -81,7 +81,25 @@ class WencaiSearchRequest(BaseModel):
     """问财语义搜索请求。"""
 
     query: str = Field(..., min_length=1, description="问财自然语言查询语句")
-    perpage: int = Field(default=100, ge=1, le=500, description="每页条数（最大 500）")
+    query_type: str = Field(
+        default="stock",
+        description="查询类型，默认 stock；也支持 股票/指数/基金/港股/美股 等别名",
+    )
+    sort_key: str | None = Field(default=None, description="排序字段（使用问财返回列名）")
+    sort_order: str | None = Field(
+        default=None,
+        description="排序方向：asc/desc，也支持 升序/降序",
+    )
+    page: int = Field(default=1, ge=1, description="页码（1 起始）")
+    perpage: int = Field(default=100, ge=1, le=100, description="每页条数（最大 100）")
+    loop: bool | int = Field(
+        default=False,
+        description="False=单页；True=拉取全部；整数 n=连续拉取前 n 页",
+    )
+    retry: int = Field(default=10, ge=0, le=20, description="失败重试次数")
+    sleep: float = Field(default=0.0, ge=0.0, le=5.0, description="分页请求间隔秒数")
+    pro: bool = Field(default=False, description="是否启用问财专业版模式")
+    find: list[str] | None = Field(default=None, description="置顶显示的标的代码列表")
     cookie: str | None = Field(
         default=None,
         description="可选；不传时自动读取 easy-tdx 配置中的问财 Cookie（环境变量优先）",
@@ -91,10 +109,10 @@ class WencaiSearchRequest(BaseModel):
 class WencaiStockItem(BaseModel):
     """问财搜索结果中的单只股票。"""
 
-    symbol: str = Field(..., description="6 位股票代码")
-    market: str = Field(..., description="市场代码（SZ/SH/BJ）")
-    name: str = Field(..., description="股票简称")
-    stock_reason: str = Field(default="", description="概念解析/入选理由")
+    symbol: str
+    market: str
+    name: str
+    stock_reason: str = ""
 
 
 class WencaiSearchResponse(BaseModel):

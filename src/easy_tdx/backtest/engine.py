@@ -215,6 +215,7 @@ class BacktestEngine:
                 slippage_model=self._slippage_model,
             )
             for t in sub_trades:
+                t.reason = signal.reason
                 if not t.rejected:
                     if t.direction == "BUY":
                         cash -= t.size * t.price + t.commission + t.slippage
@@ -480,6 +481,7 @@ class BacktestEngine:
                     "pnl",
                     "cost_basis",
                     "rejected",
+                    "reason",
                 ]
             )
 
@@ -494,6 +496,7 @@ class BacktestEngine:
                 "pnl": t.pnl,
                 "cost_basis": t.cost_basis,
                 "rejected": t.rejected,
+                "reason": t.reason,
             }
             for t in trades
         ]

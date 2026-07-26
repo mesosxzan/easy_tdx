@@ -134,6 +134,7 @@ class OrderSimulator:
                     position_mode=position_mode,
                 )
                 if trade is not None:
+                    trade.reason = signal.reason
                     trades.append(trade)
                     if not trade.rejected:
                         current_cash -= trade.size * trade.price + trade.commission + trade.slippage
@@ -150,6 +151,7 @@ class OrderSimulator:
                     position_mode=position_mode,
                 )
                 if trade is not None:
+                    trade.reason = signal.reason
                     trades.append(trade)
                     if not trade.rejected:
                         current_cash += trade.size * trade.price - trade.commission - trade.slippage

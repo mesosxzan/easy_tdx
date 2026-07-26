@@ -37,6 +37,7 @@ class Signal:
     stop_loss: float | None = None
     take_profit: float | None = None
     source: str = "strategy"
+    reason: str = ""
 
 
 # ── 成交记录 ────────────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ class Trade:
     # BUY 行恒为 0.0。仅 _compute_pnls 平仓时填入。
     cost_basis: float = 0.0
     rejected: bool = False
+    reason: str = ""
 
 
 # ── 持仓快照 ────────────────────────────────────────────────────────────────

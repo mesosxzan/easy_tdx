@@ -141,7 +141,10 @@ def backtest(
 
     # 0. 解析代码参数（自动推断市场）
     if len(code_args) > 2:
-        click.echo("错误: 参数过多，用法: easy-tdx backtest 600519 或 easy-tdx backtest SH 600519", err=True)
+        click.echo(
+            "错误: 参数过多，用法: easy-tdx backtest 600519 或 easy-tdx backtest SH 600519",
+            err=True,
+        )
         raise SystemExit(1)
     market, code = _parse_code_args(code_args)
 
@@ -333,6 +336,7 @@ def _print_table(result: Any, df: Any = None) -> None:
     click.echo(f"最大回撤: {perf.get('max_drawdown', 0):.2%}")
     click.echo(f"夏普比率: {perf.get('sharpe', 0):.2f}")
     click.echo(f"胜率: {perf.get('win_rate', 0):.2%}")
+    click.echo(f"盈亏比: {perf.get('profit_factor', 0):.2f}")
     click.echo(f"交易次数: {perf.get('total_trades', 0)}")
     click.echo()
 
@@ -358,10 +362,12 @@ def _print_table(result: Any, df: Any = None) -> None:
         for idx, trade in recent_trades.iterrows():
             direction = "买入" if trade["direction"] == "BUY" else "卖出"
             status = "拒绝" if trade["rejected"] else "成交"
+            reason = trade.get("reason", "")
+            reason_str = f" {reason}" if reason else ""
             click.echo(
                 f"  [{trade['datetime']}] {direction} "
                 f"数量={trade['size']:.0f} 价格={trade['price']:.2f} "
-                f"盈亏={trade['pnl']:.2f} [{status}]"
+                f"盈亏={trade['pnl']:.2f} [{status}]{reason_str}"
             )
     else:
         click.echo("无交易记录")
@@ -500,6 +506,7 @@ def _print_portfolio_table(result: Any) -> None:
     click.echo(f"总资金: {perf.get('total_cash', 0):,.0f}")
     click.echo(f"组合收益率: {perf.get('total_return', 0):.2%}")
     click.echo(f"组合年化: {perf.get('annual_return', 0):.2%}")
+    click.echo(f"盈亏比: {perf.get('profit_factor', 0):.2f}")
     click.echo()
 
     click.echo("── 各标的详情 ──")
@@ -510,6 +517,7 @@ def _print_portfolio_table(result: Any) -> None:
             f"  {key}: 收益={sp.get('total_return', 0):.2%} "
             f"夏普={sp.get('sharpe', 0):.2f} "
             f"回撤={sp.get('max_drawdown', 0):.2%} "
+            f"盈亏比={sp.get('profit_factor', 0):.2f} "
             f"分配={alloc:.0%} "
             f"交易={sp.get('total_trades', 0)}"
         )

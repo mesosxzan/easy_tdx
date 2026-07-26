@@ -234,7 +234,7 @@ def _create_app(
     app.include_router(announcement_router, prefix="/api/v1")
     # 新浪财报三表路由（独立数据源）
     app.include_router(sina_router, prefix="/api/v1")
-    # 同花顺问财语义搜索路由（独立数据源，直接请求问财 API）
+    # 同花顺问财语义搜索路由（独立数据源，依赖 pywencai）
     app.include_router(wencai_router, prefix="/api/v1")
     # 回测路由（纯计算，不依赖行情连接 lifespan）
     app.include_router(backtest_router, prefix="/api/v1")

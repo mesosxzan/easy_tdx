@@ -60,7 +60,9 @@ def test_wencai_search_request_defaults():
     from easy_tdx.web.schemas import WencaiSearchRequest
 
     req = WencaiSearchRequest(query="今日涨幅前十")
+    assert req.query_type == "stock"
     assert req.perpage == 100
+    assert req.loop is False
 
 
 def test_api_error_response():
