@@ -1,26 +1,40 @@
 """影线后收阳线策略。
 
-买入条件（四条件全部满足）：
+买入条件（全部满足）：
   1. 当天收阳线（close > open）
-  2. MA5 日均线斜率大于 0（MA5 上行）
+  2. MA5 上行 或 当日为标准反转形态
+     - MA5 上行：MA5 日均线斜率大于 0（MA5 上行）
+     - 标准反转形态（MA5 下行时作为替代买入信号）：
+       * 刺透形态：当日开盘低于前日最低价，
+         收盘高于前日实体中点但低于前日开盘价
+       * 看涨吞没：当日阳线实体完全覆盖前日阴线实体
+         （开盘 <= 前日收盘，收盘 >= 前日开盘）
+       * 启明星：前两日大阴线 + 前一日小实体星线（在前两日实体之下）
+         + 当日阳线收盘深入前两日实体
+       * 强势反转阳线：当日阳线收盘突破前日实体顶部（收盘 >= 前日开盘），
+         且实体 >= 前日阴线实体 × 2 倍（强势放量反转，允许轻微高开）
   3. 当天收盘价 > 前一天最低价（close > prev_low）
-  4. 前一天阴线不能有长上影线（上影 > 实体 × UPPER_SHADOW_RATIO 则排除）
+  4. 前一天必须收阴线（prev_close < prev_open）
+  5. 前一天阴线不能有长上影线（上影 > 实体 × UPPER_SHADOW_RATIO 则排除）
 
 以当天收盘价买入。
 
 卖出规则（持仓后逐日检查）：
   - 非均线多头排列：现有卖出逻辑（优先级从高到低）：
-      * 低开 2 个点（开盘价 <= 前日收盘价 * 0.98）：以开盘价全部卖出
+      * 低开 3 个点（开盘价 <= 前日收盘价 * 0.97）：以开盘价全部卖出
       * 收阴线（close < open）：以收盘价全部卖出
       * 买入后第一日收盘下跌（close < 前日收盘价）：以收盘价全部清仓
       * 其余情况：
           - 买入后第一日：以收盘价卖出一半
-          - 后续交易日：持有，直到出现阴线或低开 2 个点时全部卖出
+          - 后续交易日：持有，直到出现阴线或低开 3 个点时全部卖出
   - 均线多头排列（MA5 > MA20 > MA60、MA10 > MA20 > MA60 且四线斜率角度
-    均 > 5°；MA5 若低于 MA10 偏离不超过 1%）：
-    均线止损逻辑：
-      * MA5 斜率角度 < 45°（缓涨）：收盘价跌破 10 日均线止损
-      * MA5 斜率角度 >= 45°（急涨）：收盘价跌破 5 日均线止损
+    均 > -1°；MA5 若低于 MA10 偏离不超过 1%）：
+    均线止损逻辑（优先级从高到低）：
+      * 粘合止损：MA5/MA10 粘合（差值 <= 2%），开盘价跌破 10 日均线且当日收阴
+      * 缓涨止损（非粘合）：MA5 斜率角度 < 45°，收盘价跌破 10 日均线
+      * 缓涨止损（粘合）：MA5/MA10 粘合 且 MA5 斜率角度 < 45°，
+        开盘价与收盘价中的最高价跌破 10 日均线
+      * 急涨止损：MA5 斜率角度 >= 45°，收盘价跌破 5 日均线
 
 .. note::
 
@@ -55,14 +69,17 @@ from easy_tdx.backtest import Strategy
 
 # ── 常量 ─────────────────────────────────────────────────────────────────────
 
-LOW_OPEN_THRESHOLD = 0.97  # 低开 2 个点：open <= prev_close * 0.98
-UPPER_SHADOW_RATIO = 1.0  # 长上影阈值：阴线上影 > 实体 × 此倍数则排除买入
+LOW_OPEN_THRESHOLD = 0.97  # 低开 3 个点：open <= prev_close * 0.97
+UPPER_SHADOW_RATIO = 1.5  # 长上影阈值：阴线上影 > 实体 × 此倍数则排除买入
+STAR_BODY_RATIO = 0.5  # 启明星星线实体最大比例（占前两日实体）
+STRONG_REVERSAL_BODY_RATIO = 2.0  # 强势反转阳线实体最小倍数（占前日阴线实体）
 MA_LONG_PERIOD = 20  # 趋势判断均线周期（20 日均线）
 MA_VERY_LONG_PERIOD = 60  # 多头排列长均线周期（60 日均线）
 MA_STOP_PERIOD = 10  # 缓涨止损均线周期（10 日均线）
 SLOPE_THRESHOLD_DEG = 45.0  # MA5 斜率角度阈值（度）
 MA_BULLISH_SLOPE_MIN = -1.0  # 均线多头排列斜率最小角度（度）
 MA_BULLISH_MA5_DEVIATION = 0.01  # MA5 低于 MA10 的最大允许偏离（1%）
+MA_CONVERGENCE_THRESHOLD = 0.02  # MA5/MA10 粘合阈值（2%）
 
 # 状态枚举（用字符串常量，避免引入 enum 开销）
 _WAITING = "WAITING"              # 空仓等待买入信号
@@ -105,16 +122,35 @@ class ShadowYangStrategy(Strategy):
             # 均线多头排列：均线止损逻辑
             ma5_now = self.ma5[i]
             ma5_prev = self.ma5[i - 1] if i > 0 else float("nan")
+            ma10_now = self.ma10[i]
             angle = self._calc_ma_angle(ma5_now, ma5_prev)
 
-            if angle < SLOPE_THRESHOLD_DEG:
-                # MA5 斜率 < 45°（缓涨）：收盘价跌破 10 日均线止损
-                stop_ma = self.ma10[i]
-            else:
-                # MA5 斜率 >= 45°（急涨）：收盘价跌破 5 日均线止损
-                stop_ma = self.ma5[i]
+            should_sell = False
 
-            if cur_close < stop_ma:
+            is_converged = self._is_ma_converged(ma5_now, ma10_now)
+
+            # 粘合止损：MA5/MA10 粘合（差值 <= 2%），开盘价跌破 MA10 且收阴
+            if is_converged:
+                if cur_open < ma10_now and cur_close < cur_open:
+                    should_sell = True
+
+            # 斜率止损（粘合未触发时检查）
+            if not should_sell:
+                if angle < SLOPE_THRESHOLD_DEG:
+                    if is_converged:
+                        # 粘合 + 缓涨：开盘价与收盘价中的最高价跌破 MA10 才止损
+                        if max(cur_open, cur_close) < ma10_now:
+                            should_sell = True
+                    else:
+                        # 非粘合 + 缓涨：收盘价跌破 10 日均线止损
+                        if cur_close < ma10_now:
+                            should_sell = True
+                else:
+                    # 急涨：收盘价跌破 5 日均线止损
+                    if cur_close < ma5_now:
+                        should_sell = True
+
+            if should_sell:
                 self.sell(size=0, price=cur_close)
                 self._state = _WAITING
         else:
@@ -123,7 +159,7 @@ class ShadowYangStrategy(Strategy):
             is_yin = cur_close < cur_open
 
             if is_low_open:
-                # 低开 2 个点：以开盘价全部卖出
+                # 低开 3 个点：以开盘价全部卖出
                 self.sell(size=0, price=cur_open)
                 self._state = _WAITING
             elif is_yin:
@@ -146,7 +182,10 @@ class ShadowYangStrategy(Strategy):
     def _check_buy(
         self, cur_close: float, cur_open: float, prev_low: float
     ) -> None:
-        """检查买入条件：阳线 + MA5 斜率上行 + 收盘价 > 前日最低价 + 前日阴线无长上影。"""
+        """检查买入条件：阳线 + (MA5上行或标准反转形态) + 收盘>前日最低 + 前日收阴 + 前日无长上影。
+
+        标准反转形态包括：刺透形态、看涨吞没、启明星、强势反转阳线。
+        """
         is_yang = cur_close > cur_open
 
         # MA5 斜率：当前 MA5 > 前一根 MA5
@@ -158,18 +197,54 @@ class ShadowYangStrategy(Strategy):
         # 收盘价必须大于前日最低价（NaN 比较为 False，自然跳过首根 K 线）
         is_close_above_prev_low = cur_close > prev_low
 
-        # 前一天阴线不能有长上影线（上影 > 实体 × UPPER_SHADOW_RATIO 则排除买入）
+        # 前一天 OHLC（用于判断阴线 + 上影线 + 刺透形态）
         prev_open = self.data.open[-1]
         prev_high = self.data.high[-1]
         prev_close = self.data.close[-1]
+
+        # 前一天必须收阴线（close < open）
+        is_prev_yin = prev_close < prev_open
+
+        # 前一天阴线不能有长上影线（上影 > 实体 × UPPER_SHADOW_RATIO 则排除买入）
         is_prev_no_long_upper_shadow = not self._is_long_upper_shadow_yin(
             prev_open, prev_high, prev_close
         )
 
+        # 刺透形态：MA5 下行时作为替代买入信号
+        is_piercing_line = self._is_piercing_line(
+            cur_open, cur_close, prev_open, prev_close, prev_low
+        )
+
+        # 看涨吞没形态：MA5 下行时作为替代买入信号
+        is_bullish_engulfing = self._is_bullish_engulfing(
+            cur_open, cur_close, prev_open, prev_close
+        )
+
+        # 启明星形态：MA5 下行时作为替代买入信号
+        is_morning_star = self._is_morning_star(
+            cur_open, cur_close, prev_open, prev_close,
+            self.data.open[-2], self.data.close[-2],
+        )
+
+        # 强势反转阳线：MA5 下行时作为替代买入信号
+        is_strong_reversal_yang = self._is_strong_reversal_yang(
+            cur_open, cur_close, prev_open, prev_close
+        )
+
+        # MA 条件：MA5 上行 或 标准反转形态（刺透/吞没/启明星/强势反转）
+        is_ma_condition_met = (
+            is_ma5_up
+            or is_piercing_line
+            or is_bullish_engulfing
+            or is_morning_star
+            or is_strong_reversal_yang
+        )
+
         if (
             is_yang
-            and is_ma5_up
+            and is_ma_condition_met
             and is_close_above_prev_low
+            and is_prev_yin
             and is_prev_no_long_upper_shadow
         ):
             self.buy(size=0, price=cur_close)
@@ -202,14 +277,14 @@ class ShadowYangStrategy(Strategy):
             return False
 
         # 四条均线斜率角度均 > 阈值
-        for ma_now, ma_prev in (
-            (self.ma5[i], self.ma5[i - 1]),
-            (self.ma10[i], self.ma10[i - 1]),
-            (self.ma20[i], self.ma20[i - 1]),
-            (self.ma60[i], self.ma60[i - 1]),
-        ):
-            if self._calc_ma_angle(ma_now, ma_prev) <= MA_BULLISH_SLOPE_MIN:
-                return False
+        # for ma_now, ma_prev in (
+        #     (self.ma5[i], self.ma5[i - 1]),
+        #     (self.ma10[i], self.ma10[i - 1]),
+        #     (self.ma20[i], self.ma20[i - 1]),
+        #     (self.ma60[i], self.ma60[i - 1]),
+        # ):
+        #     if self._calc_ma_angle(ma_now, ma_prev) <= MA_BULLISH_SLOPE_MIN:
+        #         return False
 
         return True
 
@@ -232,6 +307,149 @@ class ShadowYangStrategy(Strategy):
         upper_shadow = prev_high - prev_open
         return upper_shadow > body * UPPER_SHADOW_RATIO
 
+    @staticmethod
+    def _is_piercing_line(
+        cur_open: float,
+        cur_close: float,
+        prev_open: float,
+        prev_close: float,
+        prev_low: float,
+    ) -> bool:
+        """判断当日是否为刺透形态（Piercing Line）。
+
+        条件（全部满足）：
+          1. 前一日阴线（prev_close < prev_open）
+          2. 当日开盘低于前日最低价（cur_open < prev_low）
+          3. 当日收盘高于前日实体中点（cur_close > (prev_open + prev_close) / 2）
+          4. 当日收盘低于前日开盘价（cur_close < prev_open，区别于吞没形态）
+
+        NaN 输入返回 False。
+        """
+        values = (cur_open, cur_close, prev_open, prev_close, prev_low)
+        if not all(v == v for v in values):
+            return False
+        if prev_close >= prev_open:
+            return False
+        if cur_open >= prev_low:
+            return False
+        midpoint = (prev_open + prev_close) / 2
+        if cur_close <= midpoint:
+            return False
+        return cur_close < prev_open
+
+    @staticmethod
+    def _is_bullish_engulfing(
+        cur_open: float,
+        cur_close: float,
+        prev_open: float,
+        prev_close: float,
+    ) -> bool:
+        """判断当日是否为看涨吞没形态（Bullish Engulfing）。
+
+        条件（全部满足）：
+          1. 前一日阴线（prev_close < prev_open）
+          2. 当日阳线（cur_close > cur_open）
+          3. 当日开盘价 <= 前日收盘价（cur_open <= prev_close）
+          4. 当日收盘价 >= 前日开盘价（cur_close >= prev_open）
+
+        即当日阳线实体完全覆盖前日阴线实体。
+        NaN 输入返回 False。
+        """
+        values = (cur_open, cur_close, prev_open, prev_close)
+        if not all(v == v for v in values):
+            return False
+        if prev_close >= prev_open:
+            return False
+        if cur_close <= cur_open:
+            return False
+        return cur_open <= prev_close and cur_close >= prev_open
+
+    @staticmethod
+    def _is_morning_star(
+        cur_open: float,
+        cur_close: float,
+        prev_open: float,
+        prev_close: float,
+        prev2_open: float,
+        prev2_close: float,
+    ) -> bool:
+        """判断当日是否为启明星形态（Morning Star）。
+
+        三根 K 线形态：
+          1. 前两日阴线（prev2_close < prev2_open），实体较大
+          2. 前一日小实体星线（|prev_open - prev_close| < 前两日实体 × STAR_BODY_RATIO），
+             星线实体在前两日实体之下（max(prev_open, prev_close) < prev2_close）
+          3. 当日阳线（cur_close > cur_open），收盘价深入前两日实体
+             （cur_close > 前两日实体中点）
+
+        NaN 输入返回 False。
+        """
+        values = (cur_open, cur_close, prev_open, prev_close, prev2_open, prev2_close)
+        if not all(v == v for v in values):
+            return False
+        # 前两日阴线
+        if prev2_close >= prev2_open:
+            return False
+        # 前两日实体
+        prev2_body = prev2_open - prev2_close
+        # 前一日小实体星线
+        prev_body = abs(prev_open - prev_close)
+        if prev_body >= prev2_body * STAR_BODY_RATIO:
+            return False
+        # 星线实体在前两日实体之下
+        if max(prev_open, prev_close) >= prev2_close:
+            return False
+        # 当日阳线
+        if cur_close <= cur_open:
+            return False
+        # 当日收盘深入前两日实体
+        midpoint = (prev2_open + prev2_close) / 2
+        return cur_close > midpoint
+
+    @staticmethod
+    def _is_strong_reversal_yang(
+        cur_open: float,
+        cur_close: float,
+        prev_open: float,
+        prev_close: float,
+    ) -> bool:
+        """判断当日是否为强势反转阳线（Strong Reversal Yang）。
+
+        条件（全部满足）：
+          1. 前一日阴线（prev_close < prev_open）
+          2. 当日阳线（cur_close > cur_open）
+          3. 当日收盘价 >= 前日开盘价（cur_close >= prev_open，收盘突破前日实体顶部）
+          4. 当日实体 >= 前日实体 × STRONG_REVERSAL_BODY_RATIO（实体至少放大2倍）
+
+        与看涨吞没的区别：不要求开盘 <= 前日收盘价（允许轻微高开），
+        但要求实体明显放大（>= 2倍），确保是强势反转而非弱反弹。
+
+        NaN 输入返回 False。
+        """
+        values = (cur_open, cur_close, prev_open, prev_close)
+        if not all(v == v for v in values):
+            return False
+        if prev_close >= prev_open:
+            return False
+        if cur_close <= cur_open:
+            return False
+        if cur_close < prev_open:
+            return False
+        prev_body = prev_open - prev_close
+        cur_body = cur_close - cur_open
+        return cur_body >= prev_body * STRONG_REVERSAL_BODY_RATIO
+
+    @staticmethod
+    def _is_ma_converged(ma5: float, ma10: float) -> bool:
+        """判断 MA5 和 MA10 是否粘合（差值百分比 <= MA_CONVERGENCE_THRESHOLD）。
+
+        以 MA10 为基准计算差值百分比：|MA5 - MA10| / MA10。
+        NaN 或除零返回 False。
+        """
+        if ma5 != ma5 or ma10 != ma10 or ma10 <= 0:
+            return False
+        return abs(ma5 - ma10) / ma10 <= MA_CONVERGENCE_THRESHOLD
+
     def _sell_half(self, cur_close: float) -> None:
         """以收盘价卖出当前持仓的一半（向下取整到 100 股整手）。"""
         position_size = self.position["size"]
@@ -241,14 +459,14 @@ class ShadowYangStrategy(Strategy):
 
     @staticmethod
     def _is_low_open(cur_open: float, prev_close: float) -> bool:
-        """判断是否低开 2 个点。
+        """判断是否低开 3 个点。
 
         Args:
             cur_open: 当日开盘价
             prev_close: 前日收盘价
 
         Returns:
-            True 如果 open <= prev_close * 0.98（低开 2 个点）
+            True 如果 open <= prev_close * 0.97（低开 3 个点）
         """
         # prev_close == prev_close 用于 NaN 检查（NaN != NaN 为 True）
         if not (prev_close == prev_close and prev_close > 0):

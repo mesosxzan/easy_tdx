@@ -164,21 +164,22 @@ def test_shadow_yang_registered():
 
 
 def test_shadow_yang_position_mode_and_warmup_bars():
-    """shadow_yang 应声明 position_mode=fixed、warmup_bars=60。"""
+    """shadow_yang 应声明 position_mode=fixed、warmup_bars=0（与 CLI 一致）。"""
     from easy_tdx.backtest.strategies import get_registry
 
     entry = get_registry().get("shadow_yang")
     assert entry.position_mode == "fixed"
-    assert entry.warmup_bars == 60
+    assert entry.warmup_bars == 0
 
 
 def test_shadow_yang_schema_includes_metadata():
-    """to_schema() 应输出 position_mode 和 warmup_bars。"""
+    """to_schema() 应输出 position_mode（warmup_bars=0 时不输出）。"""
     from easy_tdx.backtest.strategies import get_registry
 
     schema = get_registry().get("shadow_yang").to_schema()
     assert schema["position_mode"] == "fixed"
-    assert schema["warmup_bars"] == 60
+    # warmup_bars=0 时不输出（与 CLI warmup_bars 默认 0 一致）
+    assert schema.get("warmup_bars", 0) == 0
     # 参数列表
     param_names = [p["name"] for p in schema["params"]]
     assert "price_ma_period" in param_names
@@ -202,20 +203,20 @@ def test_shadow_yang_build_with_defaults():
 
     inst = get_registry().get("shadow_yang").build()
     assert inst.p["price_ma_period"] == 5
-    assert inst.p["low_open_pct"] == 0.98
-    assert inst.p["upper_shadow_ratio"] == 1.0
+    assert inst.p["low_open_pct"] == 0.97
+    assert inst.p["upper_shadow_ratio"] == 1.5
     assert inst.p["ma_long_period"] == 20
     assert inst.p["ma_stop_period"] == 10
     assert inst.p["slope_threshold"] == 45.0
     assert inst.p["ma_very_long_period"] == 60
-    assert inst.p["bullish_slope_min"] == 5.0
+    assert inst.p["bullish_slope_min"] == -1.0
     assert inst.p["bullish_ma5_deviation"] == 0.01
 
 
 def test_shadow_yang_backtest_runs_with_fixed_mode(client, sample_ohlcv):
     """shadow_yang 在 fixed 持仓模式下端到端回测应成功返回完整结果。
 
-    验证：路由层自动从注册表读取 position_mode=fixed / warmup_bars=60
+    验证：路由层自动从注册表读取 position_mode=fixed / warmup_bars=0
     传给引擎，策略的「卖一半」逻辑不会因 full 模式报错。
     """
     resp = client.post(

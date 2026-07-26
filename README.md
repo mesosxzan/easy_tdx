@@ -313,6 +313,8 @@ easy-tdx chanlun SH 600519 --multi-level 5MIN
 easy-tdx backtest SZ 300308 --strategy-file strategies/expma_cross.py --count 2000 --cash 1000000 --adjust QFQ --table
 # 推荐加上 --slippage 0.01 模拟真实滑点（元/股），使回测更贴近实盘
 
+easy-tdx backtest SZ 300308 --strategy-file strategies/expma_cross.py --table
+
 # 缠论自动桥接：引擎自动计算缠论分析并注入策略 self.chanlun
 easy-tdx backtest SZ 000001 --strategy-file strategies/chanlun_strategy.py --chanlun-level DAILY --table
 ```

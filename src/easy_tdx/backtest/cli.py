@@ -9,9 +9,45 @@ from typing import Any
 import click
 
 
+def guess_market(code: str) -> str:
+    """根据股票代码前缀自动推断所属市场。
+
+    规则：
+      6/9 开头 → SH（上海）
+      0/2/3 开头 → SZ（深圳）
+      4/8 开头 → BJ（北京）
+    """
+    code = code.strip()
+    if code.startswith(("6", "9")):
+        return "SH"
+    if code.startswith(("0", "2", "3")):
+        return "SZ"
+    if code.startswith(("4", "8")):
+        return "BJ"
+    return "SZ"
+
+
+def _parse_code_args(args: tuple[str, ...]) -> tuple[str, str]:
+    """解析命令行参数，支持多种格式：
+
+    - 单参数: '600519' → 自动推断市场
+    - 单参数: 'SH:600519' → 显式市场
+    - 双参数: 'SH', '600519' → 显式市场（向后兼容）
+    """
+    if len(args) == 2:
+        # 旧格式: easy-tdx backtest SH 600519
+        return args[0].strip().upper(), args[1].strip()
+    arg = args[0].strip()
+    # 支持 SH:600519 格式
+    if ":" in arg:
+        parts = arg.split(":", 1)
+        return parts[0].strip().upper(), parts[1].strip()
+    # 纯代码，自动推断市场
+    return guess_market(arg), arg
+
+
 @click.command()
-@click.argument("market")
-@click.argument("code")
+@click.argument("code_args", nargs=-1, required=True)
 @click.option("--strategy", "strategy_str", default=None, help="DSL 策略表达式 (P1)")
 @click.option("--strategy-file", "strategy_file", default=None, help="Python 策略文件路径")
 @click.option(
@@ -59,11 +95,11 @@ import click
     default=None,
     help="自动计算缠论分析并注入策略（如 DAILY/30MIN）",
 )
-@click.option("--table", "use_table", is_flag=True, help="表格输出")
-@click.option("--output", "output_fmt", type=click.Choice(["json", "table", "csv"]), default="json")
+@click.option("--table", "use_table", is_flag=True, default=True, help="表格输出（默认）")
+@click.option("--json", "use_json", is_flag=True, default=False, help="JSON 输出")
+@click.option("--output", "output_fmt", type=click.Choice(["json", "table", "csv"]), default=None)
 def backtest(
-    market: str,
-    code: str,
+    code_args: tuple[str, ...],
     strategy_str: str | None,
     strategy_file: str | None,
     combo_strategies: str | None,
@@ -79,28 +115,35 @@ def backtest(
     indicators: str | None,
     chanlun_level: str | None,
     use_table: bool,
-    output_fmt: str,
+    use_json: bool,
+    output_fmt: str | None,
 ) -> None:
     """回测引擎：执行策略并返回绩效报告。
 
+    CODE_ARG: 股票代码（自动推断市场），如 600519 / 000001 / SH:600519
+
     示例：
 
-      easy-tdx backtest SZ 000001 --strategy-file my_strategy.py
+      easy-tdx backtest 600519 --strategy-file strategies/shadow_yang.py
 
-      easy-tdx backtest SH 600519 --strategy-file ma_cross.py --table
+      easy-tdx backtest 000001 --strategy-file my_strategy.py --indicators MACD,KDJ
 
-      easy-tdx backtest SZ 000001 --strategy-file my_strategy.py --indicators MACD,KDJ
+      easy-tdx backtest 000001 --strategy-file chanlun_strategy.py --chanlun-level DAILY
 
-      easy-tdx backtest SZ 000001 --strategy-file chanlun_strategy.py --chanlun-level DAILY
-
-      easy-tdx backtest SZ 000001 \
-        --combo-strategies strategies/macd_cross.py,strategies/rsi_reversal.py \
-        --combo-mode MAJORITY --table
+      easy-tdx backtest 000001 \\
+        --combo-strategies strategies/macd_cross.py,strategies/rsi_reversal.py \\
+        --combo-mode MAJORITY
     """
     from ..backtest.engine import BacktestEngine
     from ..cli.conn import get_mac_client
     from ..cli.parsers import parse_adjust, parse_market, parse_period
     from ..indicator import compute_indicators
+
+    # 0. 解析代码参数（自动推断市场）
+    if len(code_args) > 2:
+        click.echo("错误: 参数过多，用法: easy-tdx backtest 600519 或 easy-tdx backtest SH 600519", err=True)
+        raise SystemExit(1)
+    market, code = _parse_code_args(code_args)
 
     # 1. 加载策略（单策略 or 多因子组合）
     is_combo = combo_strategies is not None
@@ -159,12 +202,17 @@ def backtest(
         )
         result = engine.run(df)
 
-    # 5. 输出结果
-    fmt = "table" if use_table else output_fmt
+    # 5. 输出结果（默认 table）
+    if use_json:
+        fmt = "json"
+    elif output_fmt:
+        fmt = output_fmt
+    else:
+        fmt = "table"
     if fmt == "json":
         click.echo(result.to_json())
     elif fmt == "table":
-        _print_table(result)
+        _print_table(result, df)
     else:
         click.echo(result.to_json())
 
@@ -260,13 +308,27 @@ def _load_combo_strategies(combo_strategies: str) -> list[type]:
     return classes
 
 
-def _print_table(result: Any) -> None:
+def _print_table(result: Any, df: Any = None) -> None:
     """以表格形式输出回测结果。"""
     perf = result.performance
     config = result.config
 
+    # 计算买入持有收益
+    strategy_return = perf.get('total_return', 0)
+    buy_hold_return = 0.0
+    if df is not None and len(df) >= 2:
+        close_col = 'close' if 'close' in df.columns else None
+        if close_col:
+            first_close = float(df[close_col].iloc[0])
+            last_close = float(df[close_col].iloc[-1])
+            if first_close > 0:
+                buy_hold_return = (last_close / first_close) - 1
+    excess_return = strategy_return - buy_hold_return
+
     click.echo("=== 回测绩效概要 ===")
-    click.echo(f"总收益率: {perf.get('total_return', 0):.2%}")
+    click.echo(f"策略累计收益: {strategy_return:.2%}")
+    click.echo(f"买入持有收益: {buy_hold_return:.2%}")
+    click.echo(f"超额收益: {excess_return:.2%}")
     click.echo(f"年化收益: {perf.get('annual_return', 0):.2%}")
     click.echo(f"最大回撤: {perf.get('max_drawdown', 0):.2%}")
     click.echo(f"夏普比率: {perf.get('sharpe', 0):.2f}")

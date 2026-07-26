@@ -1,0 +1,289 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.11.11, pytest-8.3.4, pluggy-1.5.0 -- /Users/a1-6/.pyenv/versions/miniconda3-3.10-24.7.1-0/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/a1-6/project/easy_tdx
+configfile: pyproject.toml
+plugins: dash-3.4.0, anyio-4.6.2, hydra-core-1.3.2, docker-3.1.1
+collecting ... collected 15 items
+
+tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_buy_triggers_on_all_conditions FAILED [  6%]
+tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_when_yin_line FAILED [ 13%]
+tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_when_prev_not_yin FAILED [ 20%]
+tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_when_ma5_declining FAILED [ 26%]
+tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_during_warmup FAILED [ 33%]
+tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_sell_all_on_yin_line FAILED [ 40%]
+tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_sell_all_on_low_open FAILED [ 46%]
+tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_sell_half_on_other_cases FAILED [ 53%]
+tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_low_open_takes_priority_over_yin FAILED [ 60%]
+tests/unit/test_shadow_yang_strategy.py::TestFullCycle::test_cycle_sell_all_on_yin FAILED [ 66%]
+tests/unit/test_shadow_yang_strategy.py::TestFullCycle::test_cycle_sell_all_on_low_open FAILED [ 73%]
+tests/unit/test_shadow_yang_strategy.py::TestFullCycle::test_cycle_hold_multiple_bars_then_sell FAILED [ 80%]
+tests/unit/test_shadow_yang_strategy.py::TestPositionMode::test_fixed_mode_partial_sell FAILED [ 86%]
+tests/unit/test_shadow_yang_strategy.py::TestPositionMode::test_full_mode_sells_all FAILED [ 93%]
+tests/unit/test_shadow_yang_strategy.py::TestPositionMode::test_no_second_buy_while_holding FAILED [100%]
+
+=================================== FAILURES ===================================
+______________ TestBuySignal.test_buy_triggers_on_all_conditions _______________
+tests/unit/test_shadow_yang_strategy.py:142: in test_buy_triggers_on_all_conditions
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:163: in _check_buy
+    is_prev_yin = prev_close < prev_open
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+___________________ TestBuySignal.test_no_buy_when_yin_line ____________________
+tests/unit/test_shadow_yang_strategy.py:154: in test_no_buy_when_yin_line
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:163: in _check_buy
+    is_prev_yin = prev_close < prev_open
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+_________________ TestBuySignal.test_no_buy_when_prev_not_yin __________________
+tests/unit/test_shadow_yang_strategy.py:163: in test_no_buy_when_prev_not_yin
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:163: in _check_buy
+    is_prev_yin = prev_close < prev_open
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+_________________ TestBuySignal.test_no_buy_when_ma5_declining _________________
+tests/unit/test_shadow_yang_strategy.py:177: in test_no_buy_when_ma5_declining
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:163: in _check_buy
+    is_prev_yin = prev_close < prev_open
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+___________________ TestBuySignal.test_no_buy_during_warmup ____________________
+tests/unit/test_shadow_yang_strategy.py:188: in test_no_buy_during_warmup
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:163: in _check_buy
+    is_prev_yin = prev_close < prev_open
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+___________________ TestSellLogic.test_sell_all_on_yin_line ____________________
+tests/unit/test_shadow_yang_strategy.py:203: in test_sell_all_on_yin_line
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:163: in _check_buy
+    is_prev_yin = prev_close < prev_open
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+___________________ TestSellLogic.test_sell_all_on_low_open ____________________
+tests/unit/test_shadow_yang_strategy.py:216: in test_sell_all_on_low_open
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:163: in _check_buy
+    is_prev_yin = prev_close < prev_open
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+_________________ TestSellLogic.test_sell_half_on_other_cases __________________
+tests/unit/test_shadow_yang_strategy.py:228: in test_sell_half_on_other_cases
+    result = _run_backtest(df, position_mode="fixed")
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+_____________ TestSellLogic.test_low_open_takes_priority_over_yin ______________
+tests/unit/test_shadow_yang_strategy.py:241: in test_low_open_takes_priority_over_yin
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+___________________ TestFullCycle.test_cycle_sell_all_on_yin ___________________
+tests/unit/test_shadow_yang_strategy.py:288: in test_cycle_sell_all_on_yin
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+________________ TestFullCycle.test_cycle_sell_all_on_low_open _________________
+tests/unit/test_shadow_yang_strategy.py:340: in test_cycle_sell_all_on_low_open
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+____________ TestFullCycle.test_cycle_hold_multiple_bars_then_sell _____________
+tests/unit/test_shadow_yang_strategy.py:390: in test_cycle_hold_multiple_bars_then_sell
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+________________ TestPositionMode.test_fixed_mode_partial_sell _________________
+tests/unit/test_shadow_yang_strategy.py:412: in test_fixed_mode_partial_sell
+    result = _run_backtest(df, position_mode="fixed")
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+__________________ TestPositionMode.test_full_mode_sells_all ___________________
+tests/unit/test_shadow_yang_strategy.py:420: in test_full_mode_sells_all
+    result = _run_backtest(df, position_mode="full")
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+______________ TestPositionMode.test_no_second_buy_while_holding _______________
+tests/unit/test_shadow_yang_strategy.py:457: in test_no_second_buy_while_holding
+    result = _run_backtest(df)
+tests/unit/test_shadow_yang_strategy.py:116: in _run_backtest
+    return engine.run(df)
+src/easy_tdx/backtest/engine.py:137: in run
+    signals = self._generate_signals(df, chanlun_result)
+src/easy_tdx/backtest/engine.py:295: in _generate_signals
+    strat._call_next()
+src/easy_tdx/backtest/strategy.py:414: in _call_next
+    self.next()
+strategies/shadow_yang.py:98: in next
+    self._check_buy(cur_close, cur_open, prev_low)
+strategies/shadow_yang.py:160: in _check_buy
+    is_close_above_prev_low = cur_close > prev_low
+E   UnboundLocalError: cannot access local variable 'prev_close' where it is not associated with a value
+=============================== warnings summary ===============================
+../../.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/config/__init__.py:1441
+  /Users/a1-6/.pyenv/versions/miniconda3-3.10-24.7.1-0/lib/python3.11/site-packages/_pytest/config/__init__.py:1441: PytestConfigWarning: Unknown config option: asyncio_mode
+  
+    self._warn_or_fail_if_strict(f"Unknown config option: {key}\n")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_buy_triggers_on_all_conditions
+FAILED tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_when_yin_line
+FAILED tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_when_prev_not_yin
+FAILED tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_when_ma5_declining
+FAILED tests/unit/test_shadow_yang_strategy.py::TestBuySignal::test_no_buy_during_warmup
+FAILED tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_sell_all_on_yin_line
+FAILED tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_sell_all_on_low_open
+FAILED tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_sell_half_on_other_cases
+FAILED tests/unit/test_shadow_yang_strategy.py::TestSellLogic::test_low_open_takes_priority_over_yin
+FAILED tests/unit/test_shadow_yang_strategy.py::TestFullCycle::test_cycle_sell_all_on_yin
+FAILED tests/unit/test_shadow_yang_strategy.py::TestFullCycle::test_cycle_sell_all_on_low_open
+FAILED tests/unit/test_shadow_yang_strategy.py::TestFullCycle::test_cycle_hold_multiple_bars_then_sell
+FAILED tests/unit/test_shadow_yang_strategy.py::TestPositionMode::test_fixed_mode_partial_sell
+FAILED tests/unit/test_shadow_yang_strategy.py::TestPositionMode::test_full_mode_sells_all
+FAILED tests/unit/test_shadow_yang_strategy.py::TestPositionMode::test_no_second_buy_while_holding
+======================== 15 failed, 1 warning in 0.66s =========================
