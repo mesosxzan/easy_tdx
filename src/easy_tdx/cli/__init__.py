@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from ..backtest.cli import backtest, portfolio
+from ..backtest.cli import backtest, backtest_wencai, portfolio
 from ..screen.cli import screen
 from .cmd_admin import ping, version
 from .cmd_announcement import announcement
@@ -92,6 +92,7 @@ cli.add_command(chanlun)
 cli.add_command(factor)
 cli.add_command(pfactor)
 cli.add_command(backtest)
+cli.add_command(backtest_wencai)
 cli.add_command(portfolio)
 cli.add_command(run_all)
 cli.add_command(screen)

@@ -25,6 +25,7 @@ __all__ = [
     "SavedStrategyListResponse",
     "MultiStrategyItem",
     "MultiStrategyBacktestRequest",
+    "WencaiBacktestRequest",
     "serialize_result",
 ]
 
@@ -120,6 +121,36 @@ class PortfolioBacktestRequest(BaseModel):
             if not s.startswith(("SZ:", "SH:", "BJ:")) or len(s) != 9:
                 raise ValueError(f"标的格式应为 '市场:6位代码'，得到 {s!r}")
         return self
+
+
+class WencaiBacktestRequest(BaseModel):
+    """问财选股批量回测请求。
+
+    输入问财自然语言查询语句，后端先调问财搜索获取前 ``top`` 只标的，
+    再逐个独立回测（每只股票各自独立跑策略，非组合分仓），返回每只的
+    绩效摘要 + 汇总统计。适用于横向对比哪些股票适合该策略。
+    """
+
+    query: str = Field(..., min_length=1, description="问财自然语言查询语句")
+    top: int = Field(default=10, ge=1, le=50, description="取问财结果前 N 只标的")
+    strategy: str = Field(..., description="策略名（见 /backtest/strategies）")
+    params: dict[str, Any] = Field(default_factory=dict, description="策略参数")
+    cash: float = Field(default=100_000.0, gt=0, description="每只股票初始资金")
+    commission: float = Field(default=0.0003, ge=0, le=0.01)
+    min_commission: float = Field(default=5.0, ge=0)
+    stamp_tax: float = Field(default=0.001, ge=0, le=0.01)
+    slippage: float = Field(default=0.0, ge=0, le=0.05)
+    execution: Literal["next_open", "next_close"] = Field(default="next_open")
+    category: Literal["DAY", "WEEK", "MONTH", "MIN_5", "MIN_15", "MIN_30", "MIN_60"] = Field(
+        default="DAY"
+    )
+    count: int = Field(default=250, ge=20, le=2000, description="K 线根数")
+    start_date: str | None = Field(default=None, description="开始日期 YYYY-MM-DD（可选过滤）")
+    end_date: str | None = Field(default=None, description="结束日期 YYYY-MM-DD（可选过滤）")
+    cookie: str | None = Field(
+        default=None,
+        description="可选；不传时自动读取 easy-tdx 配置中的问财 Cookie",
+    )
 
 
 class OptimizeBacktestRequest(BaseModel):

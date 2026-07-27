@@ -39,13 +39,17 @@ _REQUEST_TIMEOUT = 15  # 秒
 
 
 def _resolve_cookie(cookie: str | None) -> str:
-    """优先使用显式传参，其次回退统一配置。"""
+    """优先使用显式传参，其次回退统一配置，最后使用 ths_util 默认硬编码 Cookie。
+
+    这样问财功能无需强制配置 Cookie 即可开箱使用；显式传入或已配置的 Cookie
+    优先级更高。
+    """
     resolved = (cookie or get_wencai_cookie()).strip()
     if not resolved:
-        raise WencaiError(
-            "缺少问财 Cookie。请先在 Web UI 的“服务器设置”页保存，"
-            "或在请求中传 `cookie`，或设置环境变量 `EASY_TDX_WENCAI_COOKIE`。"
-        )
+        # 回退到 ths_util 中的默认硬编码 Cookie，避免强制要求配置
+        from easy_tdx.wencai.ths_util import ths_cookie_1
+
+        resolved = ths_cookie_1.strip()
     return resolved
 
 

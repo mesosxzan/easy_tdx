@@ -376,6 +376,273 @@ def _print_table(result: Any, df: Any = None) -> None:
 # ── portfolio 多标的组合回测命令 ─────────────────────────────────────────────
 
 
+# ── backtest-wencai 问财选股批量回测命令 ──────────────────────────────────────
+
+
+def _wencai_search_stocks(query: str, top: int, cookie: str | None) -> list[dict[str, str]]:
+    """调用问财搜索并返回前 top 只标的的元信息。
+
+    返回列表元素为 ``{"symbol": "000001", "market": "SZ", "name": "平安银行"}``。
+    已按 ths_util 默认规则过滤 ST/科创板(68)/北交所(83/87)。
+    """
+    from easy_tdx.wencai import WencaiClient, WencaiError, filter_tradable
+
+    client = WencaiClient(cookie=cookie)
+    try:
+        stocks = filter_tradable(client.search(query, perpage=max(top, 100)))
+    except WencaiError as e:
+        click.echo(f"错误: 问财搜索失败: {e}", err=True)
+        raise SystemExit(1)
+
+    if not stocks:
+        click.echo(f"错误: 问财未返回任何结果，查询语句: {query}", err=True)
+        raise SystemExit(1)
+
+    return [
+        {"symbol": s.symbol, "market": s.market, "name": s.name}
+        for s in stocks[:top]
+    ]
+
+
+def _build_wencai_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """根据逐个回测结果列表构建汇总统计。"""
+    valid = [r for r in results if r.get("error") is None and r.get("performance")]
+    if not valid:
+        return {"avg_return": 0.0, "avg_sharpe": 0.0, "positive_count": 0, "negative_count": 0}
+
+    returns = [r["performance"].get("total_return", 0) for r in valid]
+    sharpes = [r["performance"].get("sharpe", 0) for r in valid]
+    best = max(valid, key=lambda r: r["performance"].get("total_return", 0))
+    worst = min(valid, key=lambda r: r["performance"].get("total_return", 0))
+
+    return {
+        "avg_return": sum(returns) / len(returns),
+        "avg_sharpe": sum(sharpes) / len(sharpes),
+        "positive_count": sum(1 for r in returns if r > 0),
+        "negative_count": sum(1 for r in returns if r <= 0),
+        "best": {
+            "symbol": best["symbol"],
+            "name": best["name"],
+            "return": best["performance"].get("total_return", 0),
+        },
+        "worst": {
+            "symbol": worst["symbol"],
+            "name": worst["name"],
+            "return": worst["performance"].get("total_return", 0),
+        },
+    }
+
+
+def _to_json_value(v: Any) -> Any:
+    """把 numpy scalar / NaN 转为 JSON 原生类型。"""
+    import math
+
+    if hasattr(v, "item"):
+        v = v.item()
+    if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+        return None
+    return v
+
+
+def _print_wencai_table(output: dict[str, Any]) -> None:
+    """以表格形式输出问财批量回测结果。"""
+    query = output["query"]
+    strategy = output["strategy"]
+    results = output["results"]
+    summary = output["summary"]
+
+    click.echo("=== 问财批量回测 ===")
+    click.echo(f"查询: {query}")
+    click.echo(f"策略: {strategy} | 标的: {len(results)} 只")
+    click.echo()
+
+    header = (
+        f"{'代码':<8} {'名称':<10} {'收益率':>10} {'夏普':>8} "
+        f"{'最大回撤':>10} {'胜率':>8} {'盈亏比':>8} {'交易数':>6}"
+    )
+    click.echo(header)
+    click.echo("-" * 78)
+    for r in results:
+        if r["error"] is not None:
+            click.echo(f"{r['symbol']:<8} {r['name']:<10} {'ERROR':>10} {r['error'][:40]}")
+            continue
+        perf = r["performance"]
+        ret = perf.get("total_return", 0)
+        sharpe = perf.get("sharpe", 0)
+        mdd = perf.get("max_drawdown", 0)
+        wr = perf.get("win_rate", 0)
+        pf = perf.get("profit_factor", 0)
+        trades = perf.get("total_trades", 0)
+        click.echo(
+            f"{r['symbol']:<8} {r['name']:<10} {ret:>9.2%} {sharpe:>8.2f} {mdd:>10.2%} "
+            f"{wr:>7.1%} {pf:>8.2f} {trades:>6}"
+        )
+    click.echo()
+
+    click.echo("── 汇总 ──")
+    click.echo(f"平均收益: {summary['avg_return']:.2%}")
+    click.echo(f"平均夏普: {summary['avg_sharpe']:.2f}")
+    click.echo(f"盈利: {summary['positive_count']} 只 | 亏损: {summary['negative_count']} 只")
+    if "best" in summary:
+        click.echo(
+            f"最佳: {summary['best']['symbol']} {summary['best']['name']} "
+            f"({summary['best']['return']:.2%})"
+        )
+    if "worst" in summary:
+        click.echo(
+            f"最差: {summary['worst']['symbol']} {summary['worst']['name']} "
+            f"({summary['worst']['return']:.2%})"
+        )
+
+
+@click.command(name="backtest-wencai")
+@click.argument("query")
+@click.option("--top", default=10, type=int, help="取问财结果前N只（默认10）")
+@click.option("--strategy-file", "strategy_file", required=True, help="Python 策略文件路径")
+@click.option("--cash", default=100_000.0, type=float, help="每只股票初始资金")
+@click.option("--commission", default=0.0003, type=float, help="佣金率")
+@click.option(
+    "--execution",
+    default="next_open",
+    type=click.Choice(["next_open", "next_close"]),
+    help="成交价规则",
+)
+@click.option(
+    "--position-mode",
+    "position_mode",
+    default="full",
+    type=click.Choice(["full", "fixed", "percent"], case_sensitive=False),
+    help="仓位模式",
+)
+@click.option("--warmup-bars", "warmup_bars", default=0, type=int, help="指标预热 bar 数")
+@click.option("--period", default="DAILY", help="K线周期")
+@click.option("--adjust", default="NONE", help="复权: NONE/QFQ/HFQ")
+@click.option("--count", default=500, type=int, help="K线数量")
+@click.option("--cookie", default=None, help="问财 Cookie（可选，默认读配置）")
+@click.option("--json", "use_json", is_flag=True, default=False, help="JSON 输出")
+@click.option("--table", "use_table", is_flag=True, default=True, help="表格输出（默认）")
+def backtest_wencai(
+    query: str,
+    top: int,
+    strategy_file: str,
+    cash: float,
+    commission: float,
+    execution: str,
+    position_mode: str,
+    warmup_bars: int,
+    period: str,
+    adjust: str,
+    count: int,
+    cookie: str | None,
+    use_json: bool,
+    use_table: bool,
+) -> None:
+    """问财选股批量回测：问财搜索 -> 取前N只 -> 逐个独立回测。
+
+    QUERY: 问财自然语言查询语句
+
+    示例：
+
+      easy-tdx backtest-wencai "今日涨停" --top 10 --strategy-file strategies/shadow_yang.py
+
+      easy-tdx backtest-wencai "近20日涨幅前20" --top 5 --strategy-file my_strategy.py --json
+    """
+    import json
+
+    from ..cli.conn import get_mac_client
+    from ..cli.parsers import parse_adjust, parse_market, parse_period
+
+    # 1. 加载策略
+    strategy_cls = _load_strategy_from_file(strategy_file)
+    strategy_name = strategy_cls.__name__
+
+    # 2. 问财搜索
+    click.echo(f"[*] 问财搜索: {query}", err=True)
+    stocks = _wencai_search_stocks(query, top, cookie)
+    click.echo(
+        f"[*] 策略: {strategy_name} | 标的: {len(stocks)} 只 | 资金: {cash:,.0f}/只",
+        err=True,
+    )
+
+    # 3. 逐个取行情 + 回测
+    results: list[dict[str, Any]] = []
+    with get_mac_client() as client:
+        for idx, stock in enumerate(stocks, 1):
+            symbol = stock["symbol"]
+            market = stock["market"]
+            name = stock["name"]
+            click.echo(f"  [{idx}/{len(stocks)}] {market}:{symbol} {name} ...", err=True)
+
+            try:
+                mkt = parse_market(market)
+                df = client.get_stock_kline(
+                    mkt,
+                    symbol,
+                    period=parse_period(period),
+                    start=0,
+                    count=count,
+                    adjust=parse_adjust(adjust),
+                )
+                if len(df) < 2:
+                    raise ValueError(f"K线数据不足: {len(df)} 根")
+
+                from ..backtest.engine import BacktestEngine
+
+                engine = BacktestEngine(
+                    strategy=strategy_cls,
+                    cash=cash,
+                    commission=commission,
+                    execution=execution,
+                    position_mode=position_mode,
+                    warmup_bars=warmup_bars,
+                )
+                result = engine.run(df)
+
+                results.append(
+                    {
+                        "symbol": symbol,
+                        "market": market,
+                        "name": name,
+                        "performance": {
+                            k: _to_json_value(v) for k, v in result.performance.items()
+                        },
+                        "total_trades": result.performance.get("total_trades", 0),
+                        "error": None,
+                    }
+                )
+            except Exception as e:
+                results.append(
+                    {
+                        "symbol": symbol,
+                        "market": market,
+                        "name": name,
+                        "performance": {},
+                        "total_trades": 0,
+                        "error": str(e),
+                    }
+                )
+
+    # 4. 汇总 + 输出
+    summary = _build_wencai_summary(results)
+    output = {
+        "query": query,
+        "top": top,
+        "strategy": strategy_name,
+        "stocks_searched": len(stocks),
+        "stocks_backtested": sum(1 for r in results if r["error"] is None),
+        "results": results,
+        "summary": summary,
+    }
+
+    if use_json:
+        click.echo(json.dumps(output, ensure_ascii=False, indent=2, default=str))
+    else:
+        _print_wencai_table(output)
+
+
+# ── portfolio 多标的组合回测命令 ─────────────────────────────────────────────
+
+
 @click.command()
 @click.option(
     "--stocks",

@@ -26,3 +26,16 @@ class WencaiStock:
 
 class WencaiError(TdxError):
     """问财请求或解析失败。"""
+
+
+def filter_tradable(stocks: list[WencaiStock]) -> list[WencaiStock]:
+    """按 ths_util 默认规则过滤标的：排除 ST、科创板(68)、北交所(83/87)。
+
+    与 :func:`easy_tdx.wencai.ths_util.wen_cai_stock_info_by_question` 的过滤
+    逻辑一致，用于批量回测前剔除高风险或不可回测板块标的。
+    """
+    return [
+        s
+        for s in stocks
+        if "st" not in s.name.lower() and not s.symbol.startswith(("68", "83", "87"))
+    ]

@@ -36,12 +36,13 @@ def _wencai_response(stocks: list[dict[str, Any]]) -> _MockResponse:
 
 
 def test_public_exports() -> None:
-    """模块应导出 WencaiClient / WencaiError / WencaiStock。"""
+    """模块应导出 WencaiClient / WencaiError / WencaiStock / filter_tradable。"""
     from easy_tdx import wencai
 
     assert hasattr(wencai, "WencaiClient")
     assert hasattr(wencai, "WencaiError")
     assert hasattr(wencai, "WencaiStock")
+    assert hasattr(wencai, "filter_tradable")
 
 
 def test_wencai_error_subclasses_tdx_error() -> None:
@@ -64,16 +65,58 @@ def test_wencai_stock_dataclass_fields() -> None:
     assert stock.stock_reason == "概念A"
 
 
+# ── 过滤逻辑 ─────────────────────────────────────────────────────────────────
+
+
+def test_filter_tradable_excludes_st_kb_bj() -> None:
+    """filter_tradable 应排除 ST、科创板(68)、北交所(83/87)。"""
+    from easy_tdx.wencai import WencaiStock, filter_tradable
+
+    stocks = [
+        WencaiStock(symbol="000001", market="SZ", name="平安银行", stock_reason=""),
+        WencaiStock(symbol="600519", market="SH", name="贵州茅台", stock_reason=""),
+        WencaiStock(symbol="000002", market="SZ", name="ST万科", stock_reason=""),
+        WencaiStock(symbol="688001", market="SH", name="华兴源创", stock_reason=""),
+        WencaiStock(symbol="830001", market="BJ", name="新三板股", stock_reason=""),
+        WencaiStock(symbol="870001", market="BJ", name="另一北交所", stock_reason=""),
+        WencaiStock(symbol="000003", market="SZ", name="st戴帽", stock_reason=""),
+    ]
+    result = filter_tradable(stocks)
+    assert [s.symbol for s in result] == ["000001", "600519"]
+
+
+def test_filter_tradable_empty_input() -> None:
+    """filter_tradable 空输入应返回空列表。"""
+    from easy_tdx.wencai import filter_tradable
+
+    assert filter_tradable([]) == []
+
+
 # ── Cookie 解析 ───────────────────────────────────────────────────────────────
 
 
-def test_search_missing_cookie_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_search_missing_cookie_falls_back_to_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """缺 cookie 时应回退到 ths_util 默认硬编码 cookie，不报错。"""
     monkeypatch.delenv("EASY_TDX_WENCAI_COOKIE", raising=False)
     monkeypatch.setattr(_wencai_client, "get_wencai_cookie", lambda: "")
-    from easy_tdx.wencai import WencaiClient, WencaiError
+    captured: dict[str, Any] = {}
 
-    with pytest.raises(WencaiError, match="Cookie"):
-        WencaiClient().search("涨停股票")
+    def _fake_post(url: str, data: Any = None, headers: Any = None, **kwargs: Any) -> _MockResponse:
+        captured["headers"] = headers
+        captured["data"] = data
+        return _wencai_response([{"股票代码": "000001.SZ", "股票简称": "平安银行"}])
+
+    monkeypatch.setattr(_wencai_client.requests, "post", _fake_post)
+
+    from easy_tdx.wencai import WencaiClient, ths_util
+
+    stocks = WencaiClient().search("涨停股票")
+    assert len(stocks) == 1
+    assert stocks[0].symbol == "000001"
+    # 验证使用了 ths_util 的默认硬编码 Cookie
+    assert captured["headers"]["Cookie"] == ths_util.ths_cookie_1
+    # 验证从默认 Cookie 中提取了 user_id
+    assert captured["data"]["user_id"] == "329364499"
 
 
 # ── 搜索功能 ──────────────────────────────────────────────────────────────────
@@ -282,7 +325,10 @@ def test_wencai_router_success(monkeypatch: pytest.MonkeyPatch) -> None:
     }
 
 
-def test_wencai_router_missing_cookie_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_wencai_router_missing_cookie_falls_back_to_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """问财搜索路由缺 cookie 时回退默认 cookie，返回 200。"""
     pytest.importorskip("fastapi")
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
@@ -304,5 +350,5 @@ def test_wencai_router_missing_cookie_returns_503(monkeypatch: pytest.MonkeyPatc
     client = TestClient(app)
 
     resp = client.post("/api/v1/wencai/search", json={"query": "今日涨幅前十"})
-    assert resp.status_code == 503
-    assert "Cookie" in resp.json()["detail"]
+    assert resp.status_code == 200
+    assert resp.json()["count"] == 1

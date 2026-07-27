@@ -28,3 +28,26 @@ class TestBacktestCLI:
         result = runner.invoke(backtest, ["SZ", "000001"])
         assert result.exit_code == 1
         assert "必须指定" in result.output or "错误" in result.output
+
+
+class TestBacktestWencaiCLI:
+    """测试 backtest-wencai CLI 命令。"""
+
+    def test_help(self):
+        """测试 --help 显示帮助。"""
+        from easy_tdx.backtest.cli import backtest_wencai
+
+        runner = CliRunner()
+        result = runner.invoke(backtest_wencai, ["--help"])
+        assert result.exit_code == 0
+        assert "问财选股批量回测" in result.output
+        assert "--strategy-file" in result.output
+        assert "--top" in result.output
+
+    def test_missing_strategy_file_fails(self):
+        """测试不指定策略文件则失败。"""
+        from easy_tdx.backtest.cli import backtest_wencai
+
+        runner = CliRunner()
+        result = runner.invoke(backtest_wencai, ["今日涨停"])
+        assert result.exit_code != 0

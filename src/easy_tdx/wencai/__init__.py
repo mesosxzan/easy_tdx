@@ -6,10 +6,11 @@
 from __future__ import annotations
 
 from .client import WencaiClient
-from .models import WencaiError, WencaiStock
+from .models import WencaiError, WencaiStock, filter_tradable
 
 __all__ = [
     "WencaiClient",
     "WencaiError",
     "WencaiStock",
+    "filter_tradable",
 ]

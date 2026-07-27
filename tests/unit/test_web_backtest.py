@@ -1096,3 +1096,169 @@ def test_list_tasks_limit(client, sample_ohlcv):
 
     resp = client.get("/api/v1/backtest/tasks?limit=2")
     assert resp.json()["count"] <= 2
+
+
+# ---------------------------------------------------------------------------
+# 问财选股批量回测路由
+# ---------------------------------------------------------------------------
+
+
+def test_wencai_backtest_request_validation():
+    """问财批量回测请求校验。"""
+    from easy_tdx.web.backtest_schemas import WencaiBacktestRequest
+
+    # 合法请求
+    req = WencaiBacktestRequest(query="今日涨停", strategy="ma_cross")
+    assert req.top == 10  # 默认
+    assert req.cash == 100_000.0
+    assert req.category == "DAY"
+    assert req.count == 250
+
+    # top 范围校验
+    with pytest.raises(ValueError):
+        WencaiBacktestRequest(query="x", strategy="ma_cross", top=0)
+    with pytest.raises(ValueError):
+        WencaiBacktestRequest(query="x", strategy="ma_cross", top=51)
+
+    # query 不能为空
+    with pytest.raises(ValueError):
+        WencaiBacktestRequest(query="", strategy="ma_cross")
+
+    # strategy 必填
+    with pytest.raises(ValueError):
+        WencaiBacktestRequest(query="今日涨停")
+
+
+def test_wencai_backtest_endpoint(client, monkeypatch):
+    """POST /backtest/wencai/run/async 端到端（mock 问财搜索 + mock 行情取数）。"""
+    import easy_tdx.web.routers.backtest as bt_router
+    from easy_tdx.wencai import WencaiStock
+
+    # mock 问财搜索
+    mock_stocks = [
+        WencaiStock(symbol="000001", market="SZ", name="平安银行", stock_reason="银行"),
+        WencaiStock(symbol="600519", market="SH", name="贵州茅台", stock_reason="白酒"),
+    ]
+    monkeypatch.setattr(bt_router, "_wencai_search", lambda q, t, c: mock_stocks[:t])
+
+    # mock 行情取数
+    np.random.seed(7)
+
+    async def fake_fetch_bars(client_arg, symbol, category, count):  # noqa: ANN001
+        n = 100
+        close = 10 + np.cumsum(np.random.randn(n) * 0.3 + 0.05)
+        return pd.DataFrame(
+            {
+                "datetime": pd.date_range("2024-01-01", periods=n, freq="B"),
+                "open": close - 0.1,
+                "high": close + 0.2,
+                "low": close - 0.2,
+                "close": close,
+                "vol": np.full(n, 5000.0),
+                "amount": close * 5000,
+            }
+        )
+
+    monkeypatch.setattr(bt_router, "_fetch_bars", fake_fetch_bars)
+
+    resp = client.post(
+        "/api/v1/backtest/wencai/run/async",
+        json={
+            "query": "今日涨停",
+            "top": 2,
+            "strategy": "ma_cross",
+            "params": {"fast": 5, "slow": 20},
+            "cash": 100000,
+        },
+    )
+    assert resp.status_code == 202, resp.text
+    task_id = resp.json()["task_id"]
+
+    final = None
+    for _ in range(200):
+        poll = client.get(f"/api/v1/backtest/tasks/{task_id}")
+        final = poll.json()
+        if final["status"] in ("done", "failed"):
+            break
+        time.sleep(0.05)
+
+    assert final["status"] == "done", final
+    result = final["result"]
+    assert result["query"] == "今日涨停"
+    assert result["top"] == 2
+    assert result["strategy"] == "ma_cross"
+    assert result["stocks_backtested"] == 2
+    assert len(result["results"]) == 2
+    # 每个结果有 performance + error 字段
+    for r in result["results"]:
+        assert "symbol" in r
+        assert "name" in r
+        assert "performance" in r
+        assert "error" in r
+        assert r["error"] is None
+        assert "total_return" in r["performance"]
+    # 汇总统计
+    summary = result["summary"]
+    assert "avg_return" in summary
+    assert "avg_sharpe" in summary
+    assert "positive_count" in summary
+    assert "negative_count" in summary
+    assert "best" in summary
+    assert "worst" in summary
+
+
+def test_wencai_backtest_no_results_returns_400(client, monkeypatch):
+    """问财无结果时应返回 400。"""
+    import easy_tdx.web.routers.backtest as bt_router
+
+    monkeypatch.setattr(bt_router, "_wencai_search", lambda q, t, c: [])
+
+    resp = client.post(
+        "/api/v1/backtest/wencai/run/async",
+        json={"query": "不存在的条件", "strategy": "ma_cross"},
+    )
+    assert resp.status_code == 400
+
+
+def test_wencai_backtest_bad_strategy_fails(client, monkeypatch):
+    """未知策略在后台任务内抛错 -> failed。"""
+    import easy_tdx.web.routers.backtest as bt_router
+    from easy_tdx.wencai import WencaiStock
+
+    mock_stocks = [WencaiStock(symbol="000001", market="SZ", name="平安银行", stock_reason="")]
+    monkeypatch.setattr(bt_router, "_wencai_search", lambda q, t, c: mock_stocks[:t])
+
+    np.random.seed(1)
+
+    async def fake_fetch_bars(client_arg, symbol, category, count):  # noqa: ANN001
+        n = 50
+        close = 10 + np.cumsum(np.random.randn(n) * 0.2)
+        return pd.DataFrame(
+            {
+                "datetime": pd.date_range("2024-01-01", periods=n, freq="B"),
+                "open": close - 0.1,
+                "high": close + 0.2,
+                "low": close - 0.2,
+                "close": close,
+                "vol": np.full(n, 5000.0),
+                "amount": close * 5000,
+            }
+        )
+
+    monkeypatch.setattr(bt_router, "_fetch_bars", fake_fetch_bars)
+
+    resp = client.post(
+        "/api/v1/backtest/wencai/run/async",
+        json={"query": "今日涨停", "top": 1, "strategy": "nope"},
+    )
+    assert resp.status_code == 202
+    task_id = resp.json()["task_id"]
+
+    for _ in range(200):
+        poll = client.get(f"/api/v1/backtest/tasks/{task_id}")
+        final = poll.json()
+        if final["status"] in ("done", "failed"):
+            break
+        time.sleep(0.05)
+
+    assert final["status"] == "failed"

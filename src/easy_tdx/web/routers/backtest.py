@@ -30,6 +30,7 @@ from easy_tdx.web.backtest_schemas import (
     TaskStateResponse,
     TaskSubmitResponse,
     TaskSummary,
+    WencaiBacktestRequest,
     serialize_result,
 )
 from easy_tdx.web.deps import get_client
@@ -176,6 +177,61 @@ async def run_portfolio_backtest_async(
     runner = get_runner()
     task_id = runner.submit(
         lambda: _run_portfolio_backtest(stock_data_list, snapshot),
+        description=description,
+    )
+    state = runner.get(task_id)
+    status: Any = state.status if state.status in ("pending", "running") else "running"
+    return TaskSubmitResponse(task_id=task_id, status=status)
+
+
+# ── 问财选股批量回测 ─────────────────────────────────────────────────────────
+
+
+@router.post(
+    "/backtest/wencai/run/async", response_model=TaskSubmitResponse, status_code=202
+)
+async def run_wencai_backtest_async(
+    req: WencaiBacktestRequest,
+    client: Any = Depends(get_client),
+) -> TaskSubmitResponse:
+    """提交问财选股批量回测后台任务。
+
+    流程：问财搜索（to_thread）-> 取前 ``top`` 只 -> 逐个取行情（async）->
+    后台线程逐个独立回测 + 汇总统计。每只股票各自独立跑策略（非组合分仓），
+    返回每只的绩效摘要 + 全局汇总。通过 GET /backtest/tasks/{task_id} 轮询结果。
+    """
+    import asyncio
+
+    # 1. 问财搜索（同步 IO，放线程池避免阻塞 event loop）
+    stocks = await asyncio.to_thread(_wencai_search, req.query, req.top, req.cookie)
+    if not stocks:
+        raise ValueError(f"问财未返回任何结果，查询语句: {req.query}")
+
+    # 2. 逐个标的取行情（async 上下文内完成）
+    stock_bars: list[tuple[str, str, str, pd.DataFrame]] = []
+    for stock in stocks:
+        symbol_full = f"{stock.market}:{stock.symbol}"
+        try:
+            df = await _fetch_bars(client, symbol_full, req.category, req.count)
+            if req.start_date or req.end_date:
+                df = _filter_df_by_date(df, req.start_date, req.end_date)
+            if len(df) < 2:
+                continue
+            stock_bars.append((stock.symbol, stock.market, stock.name, df))
+        except Exception:
+            continue  # 单个取数失败跳过，不中断整组
+
+    if not stock_bars:
+        raise ValueError("所有标的均未取到有效行情数据")
+
+    # 3. 捕获不可变快照
+    snapshot = req.model_copy()
+    description = f"问财批量 | {snapshot.strategy} | {len(stock_bars)}只"
+
+    # 4. 提交后台任务
+    runner = get_runner()
+    task_id = runner.submit(
+        lambda: _run_wencai_backtest(stock_bars, snapshot),
         description=description,
     )
     state = runner.get(task_id)
@@ -331,6 +387,128 @@ def _run_backtest(df: pd.DataFrame, req: BacktestRequest) -> dict[str, Any]:
     )
     result = engine.run(df)
     return serialize_result(result)
+
+
+def _wencai_search(query: str, top: int, cookie: str | None) -> list[Any]:
+    """调用问财搜索并返回前 top 只标的（同步，供 to_thread 调用）。
+
+    返回 :class:`~easy_tdx.wencai.models.WencaiStock` 列表，已按 ths_util
+    默认规则过滤 ST/科创板(68)/北交所(83/87)。
+    """
+    from easy_tdx.wencai import WencaiClient, filter_tradable
+
+    client = WencaiClient(cookie=cookie)
+    stocks = filter_tradable(client.search(query, perpage=max(top, 100)))
+    return stocks[:top]
+
+
+def _run_wencai_backtest(
+    stock_bars: list[tuple[str, str, str, pd.DataFrame]],
+    req: WencaiBacktestRequest,
+) -> dict[str, Any]:
+    """逐个标的独立回测并汇总统计（后台线程内调用）。
+
+    每只股票各自独立跑策略（非组合分仓），适用于横向对比哪些股票适合该策略。
+    单个标的回测失败时记录 error 并继续，不中断整组。
+    """
+    from easy_tdx.backtest import BacktestEngine
+    from easy_tdx.backtest.strategies import get_registry
+
+    try:
+        entry = get_registry().get(req.strategy)
+    except KeyError as exc:
+        raise ValueError(str(exc)) from exc
+
+    position_mode = entry.position_mode or "full"
+    warmup_bars = entry.warmup_bars or 0
+
+    results: list[dict[str, Any]] = []
+    for symbol, market, name, df in stock_bars:
+        try:
+            if len(df) < 2:
+                raise ValueError(f"K线数据不足: {len(df)} 根")
+            # 每只新建策略实例，避免内部状态跨标的污染
+            strategy = entry.build(req.params)
+            engine = BacktestEngine(
+                strategy=strategy,
+                cash=req.cash,
+                commission=req.commission,
+                min_commission=req.min_commission,
+                stamp_tax=req.stamp_tax,
+                slippage=req.slippage,
+                execution=req.execution,
+                position_mode=position_mode,
+                warmup_bars=warmup_bars,
+            )
+            result = engine.run(df)
+            serialized = serialize_result(result)
+            results.append(
+                {
+                    "symbol": symbol,
+                    "market": market,
+                    "name": name,
+                    "performance": serialized.get("performance", {}),
+                    "error": None,
+                }
+            )
+        except Exception as e:
+            results.append(
+                {
+                    "symbol": symbol,
+                    "market": market,
+                    "name": name,
+                    "performance": {},
+                    "error": str(e),
+                }
+            )
+
+    summary = _build_wencai_summary(results)
+    return {
+        "query": req.query,
+        "top": req.top,
+        "strategy": req.strategy,
+        "stocks_searched": len(stock_bars),
+        "stocks_backtested": sum(1 for r in results if r["error"] is None),
+        "results": results,
+        "summary": summary,
+    }
+
+
+def _build_wencai_summary(results: list[dict[str, Any]]) -> dict[str, Any]:
+    """根据逐个回测结果列表构建汇总统计。"""
+    valid = [r for r in results if r.get("error") is None and r.get("performance")]
+    if not valid:
+        return {
+            "avg_return": 0.0,
+            "avg_sharpe": 0.0,
+            "avg_max_drawdown": 0.0,
+            "positive_count": 0,
+            "negative_count": 0,
+        }
+
+    returns = [r["performance"].get("total_return", 0) for r in valid]
+    sharpes = [r["performance"].get("sharpe", 0) for r in valid]
+    drawdowns = [r["performance"].get("max_drawdown", 0) for r in valid]
+    best = max(valid, key=lambda r: r["performance"].get("total_return", 0))
+    worst = min(valid, key=lambda r: r["performance"].get("total_return", 0))
+
+    return {
+        "avg_return": sum(returns) / len(returns),
+        "avg_sharpe": sum(sharpes) / len(sharpes),
+        "avg_max_drawdown": sum(drawdowns) / len(drawdowns),
+        "positive_count": sum(1 for r in returns if r > 0),
+        "negative_count": sum(1 for r in returns if r <= 0),
+        "best": {
+            "symbol": best["symbol"],
+            "name": best["name"],
+            "return": best["performance"].get("total_return", 0),
+        },
+        "worst": {
+            "symbol": worst["symbol"],
+            "name": worst["name"],
+            "return": worst["performance"].get("total_return", 0),
+        },
+    }
 
 
 def _ohlcv_to_df(records: list[dict[str, Any]]) -> pd.DataFrame:

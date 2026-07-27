@@ -16,6 +16,10 @@
   3. 当天收盘价 > 前一天最低价（close > prev_low）
   4. 前一天必须收阴线（prev_close < prev_open）
   5. 前一天阴线不能有长上影线（上影 > 实体 × UPPER_SHADOW_RATIO 则排除）
+  6. 非极端追高：前5日涨幅 <= RECENT_GAIN5_MAX(10%) 或 偏离MA20 <= DEV_MA20_MAX(15%)
+     或 ADX <= ADX_MAX(50)
+     （三个条件同时超过阈值视为极端追高，不买入。数据验证：8股681笔中
+     极端追高且ADX>50的交易全部为亏损，ADX<=50的包含大盈利单如600550 +64.35%）
 
 以当天收盘价买入。
 
@@ -64,6 +68,9 @@
 
 import math
 
+import numpy as np
+from numpy.typing import NDArray
+
 from easy_tdx import MyTT
 from easy_tdx.backtest import Strategy
 
@@ -80,11 +87,28 @@ SLOPE_THRESHOLD_DEG = 45.0  # MA5 斜率角度阈值（度）
 MA_BULLISH_SLOPE_MIN = -1.0  # 均线多头排列斜率最小角度（度）
 MA_BULLISH_MA5_DEVIATION = 0.01  # MA5 低于 MA10 的最大允许偏离（1%）
 MA_CONVERGENCE_THRESHOLD = 0.02  # MA5/MA10 粘合阈值（2%）
+# 追高过滤：前5日涨幅 + 偏离MA20 双重确认（极端追高时不买入）
+RECENT_GAIN5_MAX = 10.0  # 前5日涨幅阈值（%）：超过此值视为短期已大涨
+DEV_MA20_MAX = 15.0  # 偏离MA20阈值（%）：超过此值视为价格远离中期均线
+ADX_MAX = 50.0  # ADX阈值：追高过滤时ADX>此值才过滤（强趋势追高风险更高）
 
 # 状态枚举（用字符串常量，避免引入 enum 开销）
-_WAITING = "WAITING"              # 空仓等待买入信号
-_HOLDING_FULL = "HOLDING_FULL"    # 刚买入，尚未卖出一半
-_HOLDING_HALF = "HOLDING_HALF"    # 已卖出一半，持有剩余仓位
+_WAITING = "WAITING"  # 空仓等待买入信号
+_HOLDING_FULL = "HOLDING_FULL"  # 刚买入，尚未卖出一半
+_HOLDING_HALF = "HOLDING_HALF"  # 已卖出一半，持有剩余仓位
+
+
+def _calc_adx(
+    close: NDArray[np.float64],
+    high: NDArray[np.float64],
+    low: NDArray[np.float64],
+) -> NDArray[np.float64]:
+    """计算 ADX 指标（DMI 的趋势强度部分）。
+
+    MyTT.DMI 返回 (+DI, -DI, ADX, ADXR)，此处只取 ADX 用于趋势强度判断。
+    """
+    _, _, adx, _ = MyTT.DMI(close, high, low)
+    return adx
 
 
 class ShadowYangStrategy(Strategy):
@@ -101,6 +125,7 @@ class ShadowYangStrategy(Strategy):
         self.ma10 = self.I(MyTT.MA, self.data.close, MA_STOP_PERIOD)
         self.ma20 = self.I(MyTT.MA, self.data.close, MA_LONG_PERIOD)
         self.ma60 = self.I(MyTT.MA, self.data.close, MA_VERY_LONG_PERIOD)
+        self.adx = self.I(_calc_adx, self.data.close, self.data.high, self.data.low)
         self._state: str = _WAITING
 
     def next(self) -> None:
@@ -179,9 +204,7 @@ class ShadowYangStrategy(Strategy):
 
     # ── 内部方法 ─────────────────────────────────────────────────────────────────
 
-    def _check_buy(
-        self, cur_close: float, cur_open: float, prev_low: float
-    ) -> None:
+    def _check_buy(self, cur_close: float, cur_open: float, prev_low: float) -> None:
         """检查买入条件：阳线 + (MA5上行或标准反转形态) + 收盘>前日最低 + 前日收阴 + 前日无长上影。
 
         标准反转形态包括：刺透形态、看涨吞没、启明星、强势反转阳线。
@@ -222,8 +245,12 @@ class ShadowYangStrategy(Strategy):
 
         # 启明星形态：MA5 下行时作为替代买入信号
         is_morning_star = self._is_morning_star(
-            cur_open, cur_close, prev_open, prev_close,
-            self.data.open[-2], self.data.close[-2],
+            cur_open,
+            cur_close,
+            prev_open,
+            prev_close,
+            self.data.open[-2],
+            self.data.close[-2],
         )
 
         # 强势反转阳线：MA5 下行时作为替代买入信号
@@ -240,12 +267,29 @@ class ShadowYangStrategy(Strategy):
             or is_strong_reversal_yang
         )
 
+        # 组合追高过滤：前5日涨幅 + 偏离MA20 + ADX 三重确认
+        # 数据验证（8股681笔）：极端追高（前5日涨幅>10% 且 vsMA20>15%）的交易中，
+        # ADX>50 的全部为亏损，ADX<=50 的包含大盈利单（如 600550 +64.35%）
+        i = self._bar_index
+        if i >= 5:
+            close_5ago = self.data.close[-5]
+            recent_gain5 = (cur_close - close_5ago) / close_5ago * 100
+            ma20_now = self.ma20[i]
+            dev_ma20 = (cur_close - ma20_now) / ma20_now * 100
+            adx_now = self.adx[i]
+            is_extreme_chase = (
+                recent_gain5 > RECENT_GAIN5_MAX and dev_ma20 > DEV_MA20_MAX and adx_now > ADX_MAX
+            )
+        else:
+            is_extreme_chase = False
+
         if (
             is_yang
             and is_ma_condition_met
             and is_close_above_prev_low
             and is_prev_yin
             and is_prev_no_long_upper_shadow
+            and not is_extreme_chase
         ):
             self.buy(size=0, price=cur_close)
             self._state = _HOLDING_FULL
@@ -289,9 +333,7 @@ class ShadowYangStrategy(Strategy):
         return True
 
     @staticmethod
-    def _is_long_upper_shadow_yin(
-        prev_open: float, prev_high: float, prev_close: float
-    ) -> bool:
+    def _is_long_upper_shadow_yin(prev_open: float, prev_high: float, prev_close: float) -> bool:
         """判断前一天阴线是否有长上影线（上影 > 实体 × UPPER_SHADOW_RATIO）。
 
         仅当 prev_close < prev_open（阴线）时判断；阳线返回 False（放行）。
