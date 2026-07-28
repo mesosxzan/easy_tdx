@@ -1,25 +1,5 @@
 """影线后收阳线策略 V2（优化版）。
 
-基于 shadow_yang.py 的回测数据驱动优化。本次优化（出场端优化 #22）::
-
-  数据驱动分析（50 只个股，139 笔交易，81 胜 58 负，胜率 58.3%，PF 6.18）::
-
-    入场端因子分析（52 列全量指标 + t 检验）发现：
-    - 所有单因子/组合入场过滤均无法提升总收益。策略 PF=6.18 已经很强，
-      即使"差"的入场也是正期望值（被过滤交易的 PF 仍达 1.4-5.4）。
-    - 盈利交易 avg +14.82% >> 亏损交易 avg -3.40%，任何过滤移除的盈利
-      总额远超移除的亏损总额，入场过滤方向无效。
-
-    转向出场端优化，聚焦盈利锁定和追踪止盈：
-
-  本次优化（出场端）：
-   22. 强趋势盈利锁定豁免：ADX>=30 多头强趋势时跳过 Tier1(3%) 和 Tier2(6%)
-       盈利锁定，从 Tier3(10%) 开始锁。强趋势中 3-7% 回调是正常洗盘，
-       过早锁定会截断趋势延续。盈利锁定 32 笔 avg +1.66%（vs 止盈 avg +23.1%），
-       部分被锁定的交易在强趋势中被过早截断。
-   23. 超大幅盈利追踪放宽：浮盈 > 25% 时追踪宽度从 2.0×ATR 放宽到 2.5×ATR，
-       让超大趋势单充分奔跑。原 >15% 统一用 2.0×ATR 可能截断 mega-trend。
-
 基于 shadow_yang.py 的回测数据驱动优化。本次优化（随机样本因子分析 V2）::
 
   数据驱动分析（50 只个股，188 笔交易，5 组 wencai 随机样本，
@@ -236,10 +216,8 @@ PROFIT_RELAX_THRESHOLD = 0.10  # 浮盈 > 10% 放宽止损到 MA20
 # 逐步收紧锁定利润。
 PROFIT_TIER2 = 0.05  # 浮盈 >= 5% 启用追踪止盈
 PROFIT_TIER3 = 0.15  # 浮盈 >= 15% 收紧追踪（锁定大利润）
-PROFIT_TIER4 = 0.25  # 浮盈 >= 25% 超大幅盈利追踪（放宽，让超大趋势跑）
 ATR_TRAIL_WIDE = 3.0  # 浮盈 5%-15%：宽追踪（让波动，避免被震出）
 ATR_TRAIL_TIGHT = 2.0  # 浮盈 >15%：收紧追踪（锁定大部分利润）
-ATR_TRAIL_MEGA = 2.5  # 浮盈 >25%：放宽追踪（让超大趋势充分奔跑）
 TRAILING_STOP_PCT_MAX = 12.0  # 百分比追踪上限（与 ATR 追踪取较宽者）
 
 # ── 盈利锁定阶梯（ratchet mechanism）──────────────────────────────────────
@@ -267,13 +245,6 @@ PROFIT_LOCKIN_TRIGGER4 = 0.15  # 收盘浮盈达 15%：锁定 7% 利润
 PROFIT_LOCKIN_FLOOR4 = 0.07
 PROFIT_LOCKIN_TRIGGER5 = 0.20  # 收盘浮盈达 20%：锁定 10% 利润
 PROFIT_LOCKIN_FLOOR5 = 0.10
-
-# ── 强趋势盈利锁定豁免 ──────────────────────────────────────────────────────
-# ADX>=30 多头强趋势时跳过 Tier1(3%) 和 Tier2(6%) 盈利锁定，从 Tier3(10%) 开始。
-# 强趋势中 3-7% 回调是正常洗盘，过早锁定会截断趋势延续。
-# 数据驱动：盈利锁定 32 笔交易 avg +1.66%（vs 止盈 avg +23.1%），
-# 部分被锁定的交易在强趋势中被过早截断，错失后续主升浪。
-PROFIT_LOCKIN_STRONG_TREND_MIN_TIER = 3  # 强趋势从 Tier3 开始锁定
 
 # ── 震荡市快速周转（ADX 识别震荡时缩短持仓）────────────────────────────────
 # 600206 等震荡上行股中，趋势型宽追踪（3×ATR）会让利润在来回波动中回吐。
@@ -828,18 +799,6 @@ class ShadowYangStrategy(Strategy):
         adx_now = self._adx[i]
         is_ranging = adx_now == adx_now and adx_now < ADX_RAPID_THRESHOLD
 
-        # 买入时强趋势（趋势中继休整保护）
-        # 603127 诊断：大牛股中 ADX 频繁在 20-50 之间波动，每次 ADX 跌破 30
-        # 都会导致强趋势豁免失效，恰好在趋势中继休整时触发过早卖出。
-        # 买入时 ADX>=30 的持仓，ADX 回调更可能是中继休整而非趋势反转，
-        # 应保持趋势跟踪的退出策略（放宽盈利锁定/破位卖出/最大亏损/阴线止损/时间止损）。
-        # 不要求多头排列：603127 #1 买入时 ADX=41.4 强趋势但 MA5<MA10（均线修复中），
-        # 多头排列要求会漏掉这类强趋势早期买入点。
-        is_entry_strong_trend = bool(
-            self._entry_adx == self._entry_adx
-            and self._entry_adx >= STRONG_TREND_ADX
-        )
-
         # 震荡市收紧硬止损（无方向市场中宽止损无意义，快速认错）
         stop_mult = RAPID_STOP_MULTIPLIER if is_ranging else ATR_STOP_MULTIPLIER
         hard_stop = self._entry_price - stop_mult * atr
@@ -848,8 +807,6 @@ class ShadowYangStrategy(Strategy):
             return
 
         # B. 最大亏损保护（无论任何条件，亏损超过 MAX_LOSS_PCT 强制止损）
-        # 不豁免：最大亏损保护是最后防线，趋势反转时必须及时认错。
-        # 603127 #2 实测：豁免后持仓从 -7% 扩大到 -18.52%，验证不应放宽。
         loss_pct = (self._entry_price - cur_close) / self._entry_price * 100
         if loss_pct >= MAX_LOSS_PCT:
             self._exit_position(cur_close, is_loss=True)
@@ -862,9 +819,7 @@ class ShadowYangStrategy(Strategy):
         # 无追踪保护 + 5-15% 追踪过松。盈利锁定以最高浮盈为基准，一旦达到触发
         # 阈值即将止损锁定在对应水平（只升不降），防止利润全部回吐甚至转亏。
         # 在追踪止盈之前检查：追踪止盈跟随趋势波动，盈利锁定兜底防止深度回撤。
-        # 买入时强趋势豁免：跳过 Tier3，从 Tier4 开始锁定，避免趋势中继休整
-        # 期间过早锁定而截断趋势延续。
-        profit_floor = self._calc_profit_floor(is_entry_strong_trend)
+        profit_floor = self._calc_profit_floor()
         if profit_floor > 0 and cur_close <= profit_floor:
             self._exit_position(cur_close, is_loss=profit_pct < 0, reason="盈利锁定")
             return
@@ -903,7 +858,6 @@ class ShadowYangStrategy(Strategy):
         if (
             is_ranging
             and not is_bullish
-            and not (is_entry_strong_trend and profit_pct > 0)
             and self._holding_days >= hold_threshold
             and profit_pct < RAPID_MIN_PROFIT_KEEP
         ):
@@ -975,16 +929,6 @@ class ShadowYangStrategy(Strategy):
                     else:
                         if cur_close < ma5_now:
                             should_sell = True
-
-                # 买入时强趋势+多头排列豁免：趋势中继休整中的回调不应触发破位卖出
-                # 603127 诊断：#2 买入时 ADX=42.5+多头排列，3-25 开盘<MA10+阴线
-                # 触发破位卖出(-4.8%)，但 ADX=50.6(强趋势)只是正常回调，错过+154.6%
-                # 由 ATR 硬止损和最大亏损保护兜底
-                # 仅在浮盈时豁免：亏损中的破位卖出是有效的止损信号。
-                # 920725 #2 诊断：亏损中破位卖出被跳过，等到 -8% 最大亏损保护才止损，
-                # 亏损从 -3.48% 扩大到 -8.81%
-                if is_entry_strong_trend and profit_pct > 0:
-                    should_sell = False
 
                 if should_sell:
                     # 卖出确认 - 多头排列中首次触发等 1 日确认（避免假跌破）
@@ -1066,9 +1010,7 @@ class ShadowYangStrategy(Strategy):
             self._sell_signal_pending = False
         self._prev_day_yin = cur_yin
 
-    def _calc_profit_floor(
-        self, is_entry_strong_trend: bool = False
-    ) -> float:
+    def _calc_profit_floor(self) -> float:
         """计算盈利锁定阶梯止损价（ratchet mechanism）。
 
         以持仓期间最高收盘浮盈（_highest_close_since_entry）为基准，一旦收盘
@@ -1082,19 +1024,6 @@ class ShadowYangStrategy(Strategy):
           15% 收盘浮盈 -> 锁定 7%，允许 8% 回撤
           20% 收盘浮盈 -> 锁定 10%，允许 10% 回撤
 
-        买入时强趋势豁免（is_entry_strong_trend）：
-          豁免 Tier3(10%) 的 3% 锁定。趋势中继休整期间 ADX 可能暂降到 30 以下，
-          但趋势仍将延续，不应在 10-15% 浮盈区间过早锁定 3%。
-          603127 #1：Tier3 豁免后持仓延长到 11-15，由 Tier4(15%) 触发卖出 +4.96%
-          600744 #3：05-09 达到 Tier4(18%)，Tier4 底线 5.20 在 05-15 触发 +1.65%
-
-          注意：不豁免 Tier1/Tier2。低浮盈(3-6%)时趋势尚未充分确认，保本/小利
-          锁定仍有价值。603127 #2 实测：买入时 ADX=42.5 但最高浮盈仅 4.12%，
-          豁免 Tier1 后持仓从 -3.75% 扩大到 -7.00%。
-
-        Args:
-            is_entry_strong_trend: 买入时是否为强趋势+多头排列（趋势中继休整保护）
-
         Returns:
             盈利锁定止损价；未达触发阈值时返回 0.0（不启用）
         """
@@ -1106,16 +1035,7 @@ class ShadowYangStrategy(Strategy):
         if max_profit >= PROFIT_LOCKIN_TRIGGER4:
             return self._entry_price * (1 + PROFIT_LOCKIN_FLOOR4)
         if max_profit >= PROFIT_LOCKIN_TRIGGER3:
-            # 买入时强趋势：豁免 Tier3(3%) 锁定。趋势中继休整期间 ADX 可能暂降，
-            # 但趋势仍将延续，不应在 10-15% 浮盈区间过早锁定 3%。
-            # 603127 #1：Tier3 豁免后持仓延长到 11-15，由 Tier4(15%) 触发 +4.96%
-            # 600744 #3：05-09 达到 Tier4(18%)，Tier4 底线 5.20 在 05-15 触发 +1.65%
-            if is_entry_strong_trend:
-                return 0.0
             return self._entry_price * (1 + PROFIT_LOCKIN_FLOOR3)
-        # 不豁免 Tier1/Tier2：低浮盈(3-6%)时趋势尚未充分确认，保本/小利锁定
-        # 仍有价值。603127 #2 实测：买入时 ADX=42.5 但最高浮盈仅 4.12%，
-        # 豁免 Tier1 后持仓从 -3.75% 扩大到 -7.00%。
         if max_profit >= PROFIT_LOCKIN_TRIGGER2:
             return self._entry_price * (1 + PROFIT_LOCKIN_FLOOR2)
         if max_profit >= PROFIT_LOCKIN_TRIGGER1:
@@ -1147,10 +1067,6 @@ class ShadowYangStrategy(Strategy):
         elif profit_pct < PROFIT_TIER2:
             # 趋势市：浮盈 < 5% 不追踪，只靠 ATR 硬止损（给足起飞空间）
             return None
-        elif profit_pct >= PROFIT_TIER4:
-            # 趋势市：浮盈 > 25% 超大幅盈利，放宽追踪让超大趋势充分奔跑
-            atr_mult = ATR_TRAIL_MEGA
-            trailing_pct = TRAILING_STOP_PCT_MAX
         elif profit_pct >= PROFIT_TIER3:
             # 趋势市：浮盈 > 15% 收紧追踪，锁定大部分利润
             atr_mult = ATR_TRAIL_TIGHT
