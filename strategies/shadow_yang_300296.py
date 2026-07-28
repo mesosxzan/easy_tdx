@@ -1,51 +1,5 @@
 """影线后收阳线策略 V2（优化版）。
 
-基于 shadow_yang.py 的回测数据驱动优化。本次优化（随机样本因子分析 V2）::
-
-  数据驱动分析（50 只个股，188 笔交易，5 组 wencai 随机样本，
-  92 胜 96 负，胜率 48.9%，PF 3.67）::
-
-    对 5 组问财随机查询（活跃股/中盘价值/强势/低价/高换手率）的 50 只个股
-    进行全量因子分析，在已有 CCI/MFI/BOLL 超买过滤基础上，识别 3 项新过滤因子。
-
-  本次优化（在 CCI/MFI/BOLL 过滤之上叠加）：
-   18. 新增下影线过长过滤（下影线 > 实体 × 1.0 时不买入）
-       因子分析：18 笔仅 16.7% 胜率（vs 52.4%），均收益 -1.91%。
-       反转策略中长下影线看似支撑强，实为下跌中继假支撑。
-   19. 新增 KDJ-J 极端超买过滤（J > 100 时不买入）
-       3 笔全部亏损（0% 胜率），均 -1.64%。未被 CCI/MFI/BOLL 捕获的独立超买维度。
-   20. 新增 BOLL %b 高位区间过滤（非强趋势 + 影线后收阳 + %b 0.8-1.0 时不买入）
-       15 笔仅 20% 胜率。仅过滤影线后收阳路径，保留多头排列形成（50% 胜率）
-       和强趋势中的交易（含 +93%/+49% 大盈利单）。
-
-基于 shadow_yang.py 的回测数据驱动优化。本次优化（多股超买因子过滤）::
-
-  数据驱动分析（53 只个股，400 笔交易，169 胜 231 负，胜率 42.2%，PF 2.30）::
-
-    买入日全量技术指标提取（RSI/MACD/KDJ/BOLL/CCI/WR/MFI + ADX/BIAS/MA偏离）
-    + 盈亏配对 + 分桶胜率分析，识别超买区入场为亏损主因：
-
-  诊断要点：
-    - CCI > 100（194 笔，49% 交易）：胜率 36.1%，PF 1.66
-      CCI 衡量价格偏离均值程度，>100 = 超买扩张。强趋势(36.5%)/非强趋势(35.3%)
-      均低于基准，不豁免。CCI <= 100 的 206 笔交易胜率 48.1%，PF 3.30。
-    - MFI > 80（23 笔）：胜率 30.4%，均收益 -1.55%
-      MFI 是带量 RSI，>80 = 资金流入过度。资金流超买是追高的可靠信号。
-    - BOLL %b > 1.0 + 非强趋势（34 笔）：胜率 26.5%
-      %b > 1.0 = 收盘价突破布林上轨。非强趋势中突破上轨多为冲高回落假突破；
-      强趋势中 43%（接近基准），仅非强趋势时过滤。
-
-  本次优化：
-   15. 新增 CCI 超买过滤（CCI > 100 时不买入）
-       多股因子分析：CCI > 100 在强/弱趋势中胜率均仅 36%（vs 基准 42.2%），
-       是最有效的单一过滤因子。过滤后剩余 206 笔交易胜率 48.1%，PF 3.30。
-   16. 新增 MFI 超买过滤（MFI > 80 时不买入）
-       MFI > 80 胜率 30.4%，均收益 -1.55%。资金流超买与价格超买不同步时
-       尤为危险（放量追高），MFI 直接衡量资金流入强度。
-   17. 新增 BOLL %b 超买过滤（非强趋势时 %b > 1.0 不买入）
-       BOLL %b > 1.0 在非强趋势中胜率仅 26.5%（强趋势 43% 接近基准）。
-       非强趋势中突破布林上轨多为假突破/冲高回落，强趋势中是正常趋势延续。
-
 基于 shadow_yang.py 的回测数据驱动优化。本次优化（多股买入特征分析）::
 
   数据驱动分析（8 只个股，84 笔交易，32 胜 52 负，胜率 38.1%）::
@@ -259,13 +213,6 @@ RAPID_STOP_MULTIPLIER = 1.5  # 震荡市硬止损倍数（比 2.2 紧，快速�
 RAPID_MAX_HOLD_DAYS = 3
 RAPID_MIN_PROFIT_KEEP = 0.02  # 震荡市持仓超时后最低保留浮盈（<2% 主动离场）
 
-# ── 趋势市买入宽限期（趋势中继休整保护）────────────────────────────────────
-# 300207 诊断：#5 趋势市买入(ADX=33.9)+多头排列，持仓中 ADX 降到 16.7(震荡市)
-# 触发时间止损(holding>=3, profit<2%)卖出+1.36%，但这是"趋势中继休整"——ADX
-# 5 日后回升到 30+，主升浪 +38%。趋势市买入的股票给更多时间让趋势恢复，
-# 震荡市时间止损 holding 阈值从 3 天提高到 10 天（ADX 回升后自动脱离震荡市）。
-TREND_ENTRY_RAPID_HOLD_DAYS = 10  # 趋势市买入(ADX>=20)时震荡市时间止损阈值
-
 # ── 本次优化：MA60 趋势方向过滤 ─────────────────────────────────────────────
 MA60_FLAT_LOOKBACK = 20  # MA60 近 20 日方向回看窗口
 MA60_DROP_TOLERANCE = 0.005  # MA60 近 20 日跌幅容忍（<=0.5% 视为走平）
@@ -300,59 +247,6 @@ WEAK_REBOUND_BODY_RATIO = 0.5  # 急跌中当日阳线实体 < 前日阴线实�
 # 阴线动态止损（非多头排列）
 YIN_DROP_ATR_RATIO = 1.2  # 阴线止损 = 当日跌幅 > 1.2×ATR%
 
-# ── 入场质量过滤（超买指标）────────────────────────────────────────────────
-# 多股因子分析（400 笔交易，53 只个股）：CCI/MFI/BOLL 超买区入场胜率显著
-# 低于基准（42.2%）。这些指标检测「价格已过度扩张」，与影线后收阳的反转
-# 逻辑冲突——反转信号在超买区更可能是假突破/追高而非真正的反转起点。
-#
-# CCI > 100：胜率 36.1%（强趋势 36.5%、非强趋势 35.3%，均低于基准），
-#   不豁免强趋势。CCI 衡量价格偏离均值的程度，>100 = 超买扩张。
-# MFI > 80：胜率 30.4%，均收益 -1.55%（23 笔），资金流超买的可靠信号。
-#   MFI 是带量 RSI，>80 = 资金流入过度，追高风险大。
-# BOLL %b > 1.0：非强趋势胜率 26.5%（34 笔，极差），强趋势 43%（接近基准），
-#   仅非强趋势时过滤。%b > 1.0 = 收盘价突破布林上轨，非强趋势中突破上轨
-#   多为冲高回落假突破；强趋势中突破上轨是趋势延续（正常运行）。
-CCI_PERIOD = 14  # CCI 计算周期
-CCI_OVERBOUGHT = 100  # CCI 超买阈值（所有趋势中均过滤）
-MFI_PERIOD = 14  # MFI 计算周期
-MFI_OVERBOUGHT = 80  # MFI 超买阈值（资金流超买，所有趋势中均过滤）
-BOLL_PERIOD = 20  # 布林带周期
-BOLL_DEVIATION = 2  # 布林带标准差倍数
-BOLL_PCTB_OVERBOUGHT = 1.0  # BOLL %b 超买阈值（仅非强趋势时过滤）
-BOLL_PCTB_HIGH_ZONE = 0.8  # BOLL %b 高位区间下限（0.8-1.0，非强趋势+影线后收阳专用）
-BOLL_PCTB_BULLISH_MAX = 0.8  # 多头排列形成时 BOLL %b 上限（追高保护）
-
-# ── 入场质量过滤（K线实体 + 布林带宽）──────────────────────────────────────
-# 多股因子分析（188 笔交易，50 只个股）PF 分析新增高确定性过滤因子：
-#
-# 阳线实体占比过小（body_ratio < 0.3）：13 笔仅 23.1% 胜率，PF=0.26。
-#   body_ratio = |close-open| / (high-low)，即实体占全振幅比例。< 0.3 为
-#   小实体阳线（十字星/小阳线），盘中多空争夺未分胜负，反转力度弱。
-#   分桶：<=0.3 PF=0.26，0.3-0.5 PF=6.16，0.5-0.7 PF=3.04，>0.7 PF=3.5+。
-#
-# 布林带宽"死亡区间"（boll_width 20-25%）：20 笔 35% 胜率，PF=0.67。
-#   boll_width = (upper-lower)/mid×100。20-25% 是"半收敛半扩张"的不确定
-#   区间，方向不明确。注意：带宽 > 25% 胜率反而高（64.7%，趋势明确），
-#   带宽 < 20% 也有正期望（收敛待变盘），仅 20-25% 是低效区间。
-BODY_RATIO_MIN = 0.3  # 阳线实体/全振幅下限（< 0.3 为小实体，反转力度弱）
-BOLL_WIDTH_DEATH_ZONE_LOW = 20.0  # 布林带宽"死亡区间"下限（%）
-BOLL_WIDTH_DEATH_ZONE_HIGH = 25.0  # 布林带宽"死亡区间"上限（%）
-
-# ── 入场质量过滤（K线形态 + KDJ 极端超买）──────────────────────────────────
-# 多股因子分析（188 笔交易，50 只个股，5 组 wencai 随机样本）：
-#
-# 下影线过长（lower_shadow > 实体 × 1.0）：18 笔仅 16.7% 胜率（vs 52.4%），
-#   均收益 -1.91%。反转策略中长下影线看似支撑强，实为下跌中继的假支撑--
-#   盘中抛压将价格砸至低位后小幅回升，收出长下影线，但空头力量仍占主导。
-#   分桶：<=0.5 胜率 53.1%，0.5-1.0 胜率 38.1%，1.0-1.5 胜率 0%，>1.5 胜率 21.4%。
-#
-# KDJ-J > 100：3 笔全部亏损（0% 胜率），均 -1.64%。J 值超过 100 是极端超买，
-#   价格已严重偏离均值，反转信号在此区间完全失效。这些交易未被 CCI/MFI/BOLL
-#   过滤器捕获（CCI 均 <100、MFI 均 <80），是独立的超买维度。
-LOWER_SHADOW_RATIO_MAX = 1.0  # 下影线/实体 比率上限（超过则视为假支撑）
-KDJ_PERIOD = 9  # KDJ 计算周期
-KDJ_J_OVERBOUGHT = 100  # KDJ-J 极端超买阈值（所有趋势中均过滤）
-
 # ── 假突破过滤（影线后收阳买入专用）────────────────────────────────────────
 # 当日阳线长上影线（冲高回落）且收盘价与前两日实体高点相近（偏离 ≤ 2%）时，
 # 视为假突破/诱多信号，不买入。市场含义：盘中冲高试图突破前两日高点，但被
@@ -362,6 +256,50 @@ KDJ_J_OVERBOUGHT = 100  # KDJ-J 极端超买阈值（所有趋势中均过滤）
 # 长上影线更可能是洗盘而非假突破）。
 FAKE_BREAKOUT_SHADOW_RATIO = 1.0  # 阳线长上影线：上影线 > 实体 × 1.0（严格）
 FAKE_BREAKOUT_DEVIATION_MAX = 0.02  # 收盘价与前两日 max(收盘,开盘) 偏离 ≤ 2% 视为「相近」
+
+# ── 动量与超买过滤（300296 专项诊断驱动）──────────────────────────────────────
+# 诊断（9 笔交易）：核心亏损根因有三：
+#  (a) 截利太早：3 笔盈利交易平均 MFE +9.6%，利润捕获率仅 8%-29%。#2 ADX=49
+#      强趋势单 MFE +7.28% 买后涨 63%，却被盈利锁定在 +1.04% 清出；#6 ADX=50.7
+#      MFE +13.58% 仅赚 +1.02%。根因是盈利锁定阶梯（3% 保本）在强趋势中过早触发。
+#  (b) 追高买入：#8 RSI=69.9 超买 + 3 日涨 8.2% + 量比 4.3 买在山顶，亏 -5.52%。
+#  (c) 逆势动量：#7 MACD 柱 -0.043（空头动量）买入后跌 -1.38%；#4 MACD 柱 -0.118
+#      买入后持续大跌 -10.96%（买入即顶）。
+# 方案：RSI 超买过滤 + MACD 多头动量确认 + 强趋势禁用盈利锁定。
+RSI_PERIOD = 14  # RSI 计算周期
+RSI_OVERBOUGHT = 68  # RSI >= 此值视为超买，不买入（#8 RSI=69.9 追高买在山顶）
+MACD_SHORT = 12
+MACD_LONG = 26
+MACD_SIGNAL = 9
+# 买入要求 MACD 柱 > 0（DIF > DEA，多头动量确认）。#4 MACD 柱 -0.118、#7 -0.043
+# 均为空头动量，买入后持续下跌。多头动量确认可过滤下跌中继/逆势反弹假信号。
+MACD_HIST_MIN = 0.0
+
+# ── 超跌反弹 / 恐慌反转买入（逆势均值回归）──────────────────────────────────
+# 诊断（300296，500 根）：RSI<30 + 次日阳线确认（右侧入场），5 信号 5d/20d 胜率
+# 100%，均收益 +8~12%；BIAS6<-8 右侧 5 信号 20d 胜率 100% 均 +17.58%。
+# 左侧（超跌日直接买）胜率仅 50%（下跌中继风险），故要求「前日超跌 + 当日阳线」
+# 的右侧确认。超跌反弹是均值回归逻辑，须绕过 MACD柱>0 / RSI超买 / ADX中等趋势
+# 等顺势过滤（超跌时 MACD 多为负、RSI 远低于超买线），与趋势确认买入互补。
+OVERSOLD_RSI = 30  # 前日 RSI 低于此值视为超跌（右侧入场：前日超跌 + 当日阳线）
+PANIC_DROP_3D = 0.12  # 恐慌反转：前日近 3 日累计跌幅 > 12% 视为恐慌性暴跌
+PANIC_VOL_RATIO_MIN = 1.0  # 恐慌反转需量比 >= 1.0（有承接资金，非无量阴跌）
+# 超跌反弹要求近 3 日跌幅 < 10%：跌幅 11~12% 的「半恐慌」信号往往是下跌中继
+# 而非超跌反弹（诊断 #480：3d 跌 -11.92%、RSI=26.1，后续 20d -7.93%）。跌幅 > 12%
+# 的真恐慌由 PANIC_DROP_3D 恐慌反转分支处理，此处排除中间地带。
+OVERSOLD_DROP_3D_MAX = 0.10
+# 超跌反弹日天然缩量（恐慌底部参与者少），量比要求低于顺势交易与恐慌反转。
+# 诊断（300296）：量比 0.91/0.92 的超跌反弹后续 20d +18.66%/+10.63%（大盈利），
+# 但量比>=1.0 把它们过滤掉。放宽到 0.85 可捕获缩量反弹，同时仍过滤量比<0.85
+# 的无量阴跌（如 #440 量比 0.52）。
+OVERSOLD_VOL_RATIO_MIN = 0.85
+
+# ── 盈利锁定强趋势豁免（让趋势单跑起来）──────────────────────────────────────
+# 诊断：#2 ADX=49、#6 ADX=50.7 强趋势单被盈利锁定（3% 保本）过早清出，MFE 7-13%
+# 仅捕获 8-14%。强趋势中价格波动大，盈利锁定会把主升浪中的正常回调误判为反转。
+# 方案：强趋势（ADX>=30 且 +DI>-DI）时禁用盈利锁定阶梯，改由追踪止盈管理，
+# 让趋势单充分奔跑。非强趋势保持盈利锁定（震荡市利润易回吐，需锁定）。
+PROFIT_LOCKIN_STRONG_TREND_DISABLE = True
 
 _WAITING = "WAITING"
 _HOLDING = "HOLDING"
@@ -384,36 +322,27 @@ class ShadowYangStrategy(Strategy):
         self._pdi, self._mdi, self._adx, self._adxr = self.I(
             MyTT.DMI, self.data.close, self.data.high, self.data.low
         )
-        # 入场质量过滤指标（CCI/MFI/BOLL 超买检测）
-        self._cci = self.I(MyTT.CCI, self.data.close, self.data.high, self.data.low, CCI_PERIOD)
-        self._mfi = self.I(
-            MyTT.MFI,
-            self.data.close,
-            self.data.high,
-            self.data.low,
-            self.data.vol,
-            MFI_PERIOD,
-        )
-        self._boll_upper, self._boll_mid, self._boll_lower = self.I(
-            MyTT.BOLL, self.data.close, BOLL_PERIOD, BOLL_DEVIATION
-        )
-        # KDJ 极端超买过滤（J > 100 时全部亏损）
-        self._kdj_k, self._kdj_d, self._kdj_j = self.I(
-            MyTT.KDJ, self.data.close, self.data.high, self.data.low, KDJ_PERIOD, 3, 3
+        # RSI 超买过滤 + MACD 动量确认（300296 诊断：追高/逆势亏损根因）
+        self._rsi = self.I(MyTT.RSI, self.data.close, RSI_PERIOD)
+        self._macd_dif, self._macd_dea, self._macd_hist = self.I(
+            MyTT.MACD, self.data.close, MACD_SHORT, MACD_LONG, MACD_SIGNAL
         )
         self._state: str = _WAITING
         self._entry_price: float = 0.0
         self._highest_since_entry: float = 0.0
         self._highest_close_since_entry: float = 0.0  # 收盘价MFE（过滤盘中噪音）
         self._entry_atr: float = 0.0
-        self._entry_adx: float = float("nan")  # 买入时 ADX（趋势市买入宽限期判定）
-        self._entry_bullish: bool = False  # 买入时多头排列（宽限期仅对趋势确认的股票生效）
         self._holding_days: int = 0
         self._prev_day_yin: bool = False
         self._consecutive_losses: int = 0
         self._cooldown_remaining: int = 0
         # 卖出确认机制（多头排列中首次触发等 1 日确认，避免假跌破）
         self._sell_signal_pending: bool = False
+        # 持仓期间是否曾处于强趋势（盈利锁定豁免用）。
+        # 300296 诊断：#1 入场 ADX=49 强趋势，但卖出日 ADX 降至 30 以下导致
+        # 盈利锁定仍触发，MFE+7.28% 买后涨 63% 仅赚 1.04%。改用「持仓期间曾强趋势」
+        # 判断，一旦趋势确立即整个持仓豁免盈利锁定，让趋势单充分奔跑。
+        self._was_strong_trend: bool = False
 
     def next(self) -> None:
         cur_close = self.data.close[0]
@@ -452,6 +381,55 @@ class ShadowYangStrategy(Strategy):
         is_yang = cur_close > cur_open
         is_pullback_reversal_buy = False  # 回调反转买入标志（诊断用）
 
+        # ── 超跌反弹 / 恐慌反转买入（逆势，绕过顺势过滤）──────────────────────
+        # 诊断（300296，500 根）：RSI<30 + 次日阳线确认（右侧），5 信号 5d/20d
+        # 胜率 100%，均收益 +8~12%。超跌反弹是均值回归逻辑，与趋势确认买入互补。
+        # 须绕过 MACD柱>0 / RSI超买 / ADX中等趋势等顺势过滤（超跌时 MACD 多为
+        # 负、RSI 远低于超买线）。左侧（超跌日直接买）胜率仅 50%（下跌中继风险），
+        # 故要求「前日超跌 + 当日阳线」的右侧确认，成交在次日开盘（next_open）。
+        if is_yang and i >= RSI_PERIOD + 1:
+            prev_rsi = self._rsi[i - 1]
+            # 恐慌反转：前日近 3 日累计跌幅 > 阈值（恐慌性暴跌）
+            prev_close_os = self.data.close[-1]
+            close_4ago = self.data.close[-4]
+            panic_drop = (
+                (prev_close_os - close_4ago) / close_4ago if close_4ago > 0 else 0.0
+            )
+            is_panic = panic_drop < -PANIC_DROP_3D
+            # 超跌反弹：前日 RSI<30 且近 3 日跌幅 < 10%（排除接近恐慌的暴跌中继）
+            is_oversold = bool(
+                prev_rsi == prev_rsi
+                and prev_rsi < OVERSOLD_RSI
+                and panic_drop > -OVERSOLD_DROP_3D_MAX
+            )
+            if is_oversold or is_panic:
+                # 基本风控：成交量确认 + 波动率过滤（绕过顺势过滤但保留风控）
+                # 超跌反弹容忍缩量（恐慌底部参与者少），恐慌反转要求放量承接。
+                vol_now_os = self.data.vol[0]
+                vol_ma5_os = sum(self.data.vol[-j] for j in range(1, 6)) / 5.0
+                atr_os = self._calc_atr(i)
+                vol_ratio_threshold = (
+                    PANIC_VOL_RATIO_MIN if is_panic else OVERSOLD_VOL_RATIO_MIN
+                )
+                if (
+                    vol_ma5_os > 0
+                    and vol_now_os >= vol_ma5_os * vol_ratio_threshold
+                    and cur_close > 0
+                    and atr_os / cur_close * 100 <= VOLATILITY_MAX_PCT
+                ):
+                    buy_reason = "恐慌反转" if is_panic else "超跌反弹"
+                    self.buy(size=0, price=cur_close, reason=buy_reason)
+                    self._state = _HOLDING
+                    self._entry_price = cur_close
+                    self._highest_since_entry = cur_close
+                    self._highest_close_since_entry = cur_close
+                    self._entry_atr = atr_os
+                    self._holding_days = 0
+                    self._prev_day_yin = False
+                    self._sell_signal_pending = False
+                    self._was_strong_trend = False
+                    return
+
         # 强趋势判断：ADX>=30 且 +DI>-DI（多头强趋势）时放宽追高保护。
         # 强趋势中的高涨幅/高偏离是趋势延续而非冲顶，不应被追高保护过滤。
         adx_now = self._adx[i]
@@ -464,6 +442,20 @@ class ShadowYangStrategy(Strategy):
             and adx_now >= STRONG_TREND_ADX
             and pdi_now > mdi_now
         )
+
+        # RSI 超买过滤：超买区不买入。
+        # 300296 诊断：#8 RSI=69.9 + 3 日涨 8.2% + 量比 4.3 追高买在山顶，亏 -5.52%。
+        rsi_now = self._rsi[i]
+        if rsi_now == rsi_now and rsi_now >= RSI_OVERBOUGHT:
+            return
+
+        # MACD 多头动量确认：MACD 柱须 > 0（DIF > DEA）。
+        # 300296 诊断：#4 MACD 柱 -0.118 买入后持续大跌 -10.96%（买入即顶）；
+        # #7 MACD 柱 -0.043 空头动量买入后跌 -1.38%。空头动量下的反转信号
+        # 多为下跌中继反弹假信号，要求多头动量确认可过滤。
+        macd_hist_now = self._macd_hist[i]
+        if macd_hist_now == macd_hist_now and macd_hist_now <= MACD_HIST_MIN:
+            return
 
         ma5_now = self.ma5[i]
         ma5_prev = self.ma5[i - 1] if i > 0 else float("nan")
@@ -494,7 +486,11 @@ class ShadowYangStrategy(Strategy):
         #   （后者要求 cur_close >= prev_open），是最弱的反转信号。
         # is_morning_star: 6 笔 0% 胜率。晨星形态中间日实体小（犹豫不决），
         #   反转可靠性低。样本量较小但全部亏损。
-        is_ma_condition_met = is_ma5_up or is_bullish_engulfing or is_strong_reversal_yang
+        is_ma_condition_met = (
+            is_ma5_up
+            or is_bullish_engulfing
+            or is_strong_reversal_yang
+        )
 
         # ── V2 过滤条件 ──────────────────────────────────────────────────────
 
@@ -549,7 +545,9 @@ class ShadowYangStrategy(Strategy):
                     gain_pct = (cur_close - prev_close) / prev_close if prev_close > 0 else 0
                     is_limit_up = gain_pct >= MA60_EXCEPTION_GAIN_MIN / 100
                     if not (
-                        is_strong_trend and is_limit_up and ma60_drop < MA60_EXCEPTION_DROP_MAX
+                        is_strong_trend
+                        and is_limit_up
+                        and ma60_drop < MA60_EXCEPTION_DROP_MAX
                     ):
                         return
 
@@ -600,7 +598,11 @@ class ShadowYangStrategy(Strategy):
         #   - 多头排列：趋势已确认（MA5>MA20>MA60 且 MA10>MA20>MA60），
         #     V 型反弹涨幅非冲顶追高（如急跌低点后的反弹）
         is_bullish = self._is_ma_bullish(i)
-        surge3_max = STRONG_TREND_SURGE3_MAX if (is_strong_trend or is_bullish) else SHORT_SURGE_MAX
+        surge3_max = (
+            STRONG_TREND_SURGE3_MAX
+            if (is_strong_trend or is_bullish)
+            else SHORT_SURGE_MAX
+        )
         if i >= SHORT_SURGE_DAYS:
             close_3ago = self.data.close[-SHORT_SURGE_DAYS]
             if close_3ago > 0:
@@ -625,69 +627,6 @@ class ShadowYangStrategy(Strategy):
                     prev_body = prev_open - prev_close
                     if prev_body > 0 and cur_body < prev_body * WEAK_REBOUND_BODY_RATIO:
                         return
-
-        # ── 入场质量过滤（超买指标）──────────────────────────────────────────
-        # 多股因子分析（400 笔交易，53 只个股）：CCI/MFI/BOLL 超买区入场胜率
-        # 显著低于基准（42.2%）。反转策略在超买区信号可靠性低。
-        # CCI > 100：胜率 36.1%（强/弱趋势均低，不豁免）
-        # MFI > 80：胜率 30.4%，均收益 -1.55%（资金流超买，不豁免）
-        # BOLL %b > 1.0：非强趋势胜率 26.5%（强趋势 43% 接近基准，仅非强趋势过滤）
-        # BOLL %b 0.8-1.0：非强趋势+影线后收阳 20%胜率，仅影线后收阳路径过滤
-        #
-        # 超买过滤应用于所有买入路径（含多头排列形成）。多股回测验证：
-        # 10 只个股总收益 +11.17%（vs 基线 -146.66%），"多头排列形成"在超买区
-        # 入场同样多为亏损，601991 2026-05-07 +49.6% 为孤例不可作为策略依据。
-        cci_now = self._cci[i]
-        if cci_now == cci_now and cci_now > CCI_OVERBOUGHT:
-            return
-
-        mfi_now = self._mfi[i]
-        if mfi_now == mfi_now and mfi_now > MFI_OVERBOUGHT:
-            return
-
-        # BOLL %b 高位区间标志（0.8-1.0 非强趋势，影线后收阳专用过滤）
-        is_boll_high_non_strong = False
-        if not is_strong_trend:
-            boll_upper = self._boll_upper[i]
-            boll_lower = self._boll_lower[i]
-            if boll_upper == boll_upper and boll_lower == boll_lower and boll_upper > boll_lower:
-                boll_pctb = (cur_close - boll_lower) / (boll_upper - boll_lower)
-                if boll_pctb > BOLL_PCTB_OVERBOUGHT:
-                    return
-                if boll_pctb > BOLL_PCTB_HIGH_ZONE:
-                    is_boll_high_non_strong = True
-
-        # 布林带宽"死亡区间"过滤（boll_width 20-25%）：20 笔 35% 胜率，PF=0.67
-        # 带宽 20-25% 是"半收敛半扩张"的不确定区间，方向不明确。
-        # 带宽 > 25% 胜率反而高（64.7%，趋势明确），< 20% 也有正期望（收敛待变盘）。
-        boll_mid = self._boll_mid[i]
-        if boll_mid == boll_mid and boll_mid > 0:
-            boll_upper_w = self._boll_upper[i]
-            boll_lower_w = self._boll_lower[i]
-            if boll_upper_w == boll_upper_w and boll_lower_w == boll_lower_w:
-                boll_width_pct = (boll_upper_w - boll_lower_w) / boll_mid * 100
-                if BOLL_WIDTH_DEATH_ZONE_LOW <= boll_width_pct <= BOLL_WIDTH_DEATH_ZONE_HIGH:
-                    return
-
-        # ── K 线形态 + KDJ 极端超买过滤 ──────────────────────────────────
-        # 下影线过长：下影线 > 实体 × 1.0 时为假支撑（18 笔 16.7% 胜率）
-        cur_low = self.data.low[0]
-        lower_shadow = min(cur_open, cur_close) - cur_low
-        cur_body_abs = abs(cur_close - cur_open)
-        if cur_body_abs > 0 and lower_shadow > cur_body_abs * LOWER_SHADOW_RATIO_MAX:
-            return
-
-        # KDJ-J > 100：极端超买，3 笔全部亏损（0% 胜率）
-        kdj_j_now = self._kdj_j[i]
-        if kdj_j_now == kdj_j_now and kdj_j_now > KDJ_J_OVERBOUGHT:
-            return
-
-        # 阳线实体占比过小（body_ratio < 0.3）：13 笔仅 23.1% 胜率，PF=0.26
-        # 小实体阳线（十字星/小阳线）反转力度弱，盘中多空争夺未分胜负
-        cur_high = self.data.high[0]
-        full_range = cur_high - cur_low
-        if full_range > 0 and cur_body_abs / full_range < BODY_RATIO_MIN:
-            return
 
         # ── 原始条件 ─────────────────────────────────────────────────────────
 
@@ -734,7 +673,6 @@ class ShadowYangStrategy(Strategy):
             and is_prev_no_long_upper_shadow
             and (is_pullback_reversal_buy or not is_bearish_strong_trend)
             and not is_fake_breakout
-            and not is_boll_high_non_strong
         ):
             atr = self._calc_atr(i)
             buy_reason = "回调反转买入" if is_pullback_reversal_buy else "影线后收阳"
@@ -744,11 +682,10 @@ class ShadowYangStrategy(Strategy):
             self._highest_since_entry = cur_close
             self._highest_close_since_entry = cur_close
             self._entry_atr = atr
-            self._entry_adx = self._adx[i]
-            self._entry_bullish = self._is_ma_bullish(i)
             self._holding_days = 0
             self._prev_day_yin = False
             self._sell_signal_pending = False
+            self._was_strong_trend = is_strong_trend
         elif is_yang:
             # 多头排列首次形成买入（不依赖"前日阴线"形态，捕捉主升浪起点）
             # 600539 诊断：主升浪期间大量连续阳线，无"前日阴线"形态，策略完全错过。
@@ -759,22 +696,6 @@ class ShadowYangStrategy(Strategy):
             is_bullish_now = self._is_ma_bullish(i)
             is_bullish_prev = self._is_ma_bullish(i - 1) if i > 0 else False
             if is_bullish_now and not is_bullish_prev:
-                # 多头排列形成 + BOLL%b > 0.8（非强趋势）：7 笔仅 28.6% 胜率，PF=0.28
-                # 多头排列刚形成时价格已在布林上轨附近，追高风险大。
-                # 仅非强趋势时过滤（强趋势中 BOLL%b 高位是趋势延续）。
-                if not is_strong_trend:
-                    boll_upper_bull = self._boll_upper[i]
-                    boll_lower_bull = self._boll_lower[i]
-                    if (
-                        boll_upper_bull == boll_upper_bull
-                        and boll_lower_bull == boll_lower_bull
-                        and boll_upper_bull > boll_lower_bull
-                    ):
-                        boll_pctb_bull = (cur_close - boll_lower_bull) / (
-                            boll_upper_bull - boll_lower_bull
-                        )
-                        if boll_pctb_bull > BOLL_PCTB_BULLISH_MAX:
-                            return
                 atr = self._calc_atr(i)
                 self.buy(size=0, price=cur_close, reason="多头排列形成")
                 self._state = _HOLDING
@@ -782,11 +703,10 @@ class ShadowYangStrategy(Strategy):
                 self._highest_since_entry = cur_close
                 self._highest_close_since_entry = cur_close
                 self._entry_atr = atr
-                self._entry_adx = self._adx[i]
-                self._entry_bullish = self._is_ma_bullish(i)
                 self._holding_days = 0
                 self._prev_day_yin = False
                 self._sell_signal_pending = False
+                self._was_strong_trend = is_strong_trend
 
     # ── 卖出逻辑 ─────────────────────────────────────────────────────────────
 
@@ -798,6 +718,21 @@ class ShadowYangStrategy(Strategy):
         # 震荡市判定（ADX < 阈值）：收紧止损 + 时间止损，快速周转不恋战
         adx_now = self._adx[i]
         is_ranging = adx_now == adx_now and adx_now < ADX_RAPID_THRESHOLD
+
+        # 更新持仓期间强趋势标记（用于盈利锁定豁免）。
+        # 一旦持仓中曾出现强趋势（ADX>=30 且 +DI>-DI），即标记为 True 且不再
+        # 重置，整个持仓豁免盈利锁定。300296 #1 入场 ADX=49 但卖出日 ADX<30，
+        # 原按卖出日判断导致盈利锁定误触发，MFE+7.28% 买后涨 63% 仅赚 1.04%。
+        if not self._was_strong_trend:
+            pdi_s = self._pdi[i]
+            mdi_s = self._mdi[i]
+            self._was_strong_trend = bool(
+                adx_now == adx_now
+                and pdi_s == pdi_s
+                and mdi_s == mdi_s
+                and adx_now >= STRONG_TREND_ADX
+                and pdi_s > mdi_s
+            )
 
         # 震荡市收紧硬止损（无方向市场中宽止损无意义，快速认错）
         stop_mult = RAPID_STOP_MULTIPLIER if is_ranging else ATR_STOP_MULTIPLIER
@@ -819,7 +754,10 @@ class ShadowYangStrategy(Strategy):
         # 无追踪保护 + 5-15% 追踪过松。盈利锁定以最高浮盈为基准，一旦达到触发
         # 阈值即将止损锁定在对应水平（只升不降），防止利润全部回吐甚至转亏。
         # 在追踪止盈之前检查：追踪止盈跟随趋势波动，盈利锁定兜底防止深度回撤。
-        profit_floor = self._calc_profit_floor()
+        # 强趋势豁免：持仓期间曾处于强趋势（ADX>=30 且 +DI>-DI）时禁用盈利锁定，
+        # 让趋势单充分奔跑。300296 诊断：#1 入场 ADX=49 买后涨 63% 仅赚 1.04%，
+        # 根因是卖出日 ADX 降至此阈值以下导致锁定误触发。
+        profit_floor = self._calc_profit_floor(self._was_strong_trend)
         if profit_floor > 0 and cur_close <= profit_floor:
             self._exit_position(cur_close, is_loss=profit_pct < 0, reason="盈利锁定")
             return
@@ -841,24 +779,10 @@ class ShadowYangStrategy(Strategy):
         # 例外：多头排列中不触发（多头排列说明趋势已形成，ADX 低只是趋势
         # 起步阶段，不应因 ADX<20 就时间止损清出）
         # 600539 诊断：#2 多头排列+ADX=12.8 被震荡市时间止损清出，卖后涨 52%
-        #
-        # 趋势市买入宽限期：趋势市买入(ADX>=20)且买入时多头排列的股票给更多时间
-        # 让趋势恢复。300207 诊断：#5 多头排列+ADX=33.9 买入后 ADX 降到 16.7，
-        # 原阈值 holding>=3 误杀趋势中继休整（卖后主升浪+38%）。
-        # 多头排列=趋势已确认，ADX 暂降是休整而非反转；非多头排列=趋势未确认，
-        # ADX 下降更可能反转（002407 #5 多头排列=False 延迟止损致 -2.9% vs +0.7%）。
-        if (
-            self._entry_adx == self._entry_adx
-            and self._entry_adx >= ADX_RAPID_THRESHOLD
-            and self._entry_bullish
-        ):
-            hold_threshold = TREND_ENTRY_RAPID_HOLD_DAYS
-        else:
-            hold_threshold = RAPID_MAX_HOLD_DAYS
         if (
             is_ranging
             and not is_bullish
-            and self._holding_days >= hold_threshold
+            and self._holding_days >= RAPID_MAX_HOLD_DAYS
             and profit_pct < RAPID_MIN_PROFIT_KEEP
         ):
             self._exit_position(cur_close, is_loss=profit_pct < 0, reason="震荡市时间止损")
@@ -880,7 +804,11 @@ class ShadowYangStrategy(Strategy):
                 # 持仓到 08-08 被 ATR 硬止损（多亏 8064）
                 if cur_yin:
                     atr_pct_d = atr / cur_open * 100 if cur_open > 0 else 3.0
-                    yin_drop_pct_d = (cur_open - cur_close) / cur_open * 100 if cur_open > 0 else 0
+                    yin_drop_pct_d = (
+                        (cur_open - cur_close) / cur_open * 100
+                        if cur_open > 0
+                        else 0
+                    )
                     pdi_now_d = self._pdi[i]
                     mdi_now_d = self._mdi[i]
                     is_strong_trend_relax_d = bool(
@@ -905,7 +833,9 @@ class ShadowYangStrategy(Strategy):
                             BULLISH_YIN_MIN_PCT,
                         )
                     if yin_drop_pct_d >= dynamic_threshold_d:
-                        self._exit_position(cur_close, is_loss=profit_pct < 0)
+                        self._exit_position(
+                            cur_close, is_loss=profit_pct < 0
+                        )
                         return
 
                 ma5_now = self.ma5[i]
@@ -1010,7 +940,7 @@ class ShadowYangStrategy(Strategy):
             self._sell_signal_pending = False
         self._prev_day_yin = cur_yin
 
-    def _calc_profit_floor(self) -> float:
+    def _calc_profit_floor(self, is_strong_trend: bool = False) -> float:
         """计算盈利锁定阶梯止损价（ratchet mechanism）。
 
         以持仓期间最高收盘浮盈（_highest_close_since_entry）为基准，一旦收盘
@@ -1024,9 +954,18 @@ class ShadowYangStrategy(Strategy):
           15% 收盘浮盈 -> 锁定 7%，允许 8% 回撤
           20% 收盘浮盈 -> 锁定 10%，允许 10% 回撤
 
+        Args:
+            is_strong_trend: 当前是否为强趋势（ADX>=30 且 +DI>-DI）。强趋势时
+                禁用盈利锁定，改由追踪止盈管理，避免主升浪正常回调被误判为反转。
+
         Returns:
-            盈利锁定止损价；未达触发阈值时返回 0.0（不启用）
+            盈利锁定止损价；未达触发阈值或强趋势豁免时返回 0.0（不启用）
         """
+        # 强趋势禁用盈利锁定：强趋势中价格波动大，盈利锁定会把主升浪中的正常
+        # 回调误判为反转而过早清出。300296 诊断：#2/#6 强趋势单 MFE 7-13% 仅
+        # 捕获 8-14%，被盈利锁定过早清出，错过后续大涨。改由追踪止盈管理。
+        if PROFIT_LOCKIN_STRONG_TREND_DISABLE and is_strong_trend:
+            return 0.0
         if self._entry_price <= 0 or self._highest_close_since_entry <= self._entry_price:
             return 0.0
         max_profit = (self._highest_close_since_entry - self._entry_price) / self._entry_price
