@@ -22,7 +22,9 @@ STOCKS = [
 
 STRATEGIES = {
     "V2": "strategies/shadow_yang_v2.py",
-    "V9": "strategies/shadow_yang_v9.py",
+    "V10": "strategies/shadow_yang_v10.py",
+    "V11": "strategies/shadow_yang_v11.py",
+    "V12": "strategies/shadow_yang_v12.py",
 }
 
 def load_strategy(path):

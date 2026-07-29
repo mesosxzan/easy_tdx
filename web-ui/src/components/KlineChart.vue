@@ -21,6 +21,8 @@ let chart: echarts.ECharts | null = null
 const MA5_COLOR = '#e6a700'
 const MA10_COLOR = '#b06ae3'
 const MA20_COLOR = '#4a9eff'
+const MA30_COLOR = '#00c4cc'
+const MA60_COLOR = '#ff6b9d'
 
 /** 简单移动平均：滑动窗口 O(n)，前 period-1 个为 null。 */
 function calcMA(closes: number[], period: number): (number | null)[] {
@@ -72,6 +74,8 @@ function buildOption(): echarts.EChartsCoreOption {
   const ma5 = calcMA(closes, 5)
   const ma10 = calcMA(closes, 10)
   const ma20 = calcMA(closes, 20)
+  const ma30 = calcMA(closes, 30)
+  const ma60 = calcMA(closes, 60)
 
   // 成交量：颜色随 K 线涨跌（close >= open 红，反之绿）
   const volData = bars.map((b) => ({
@@ -130,7 +134,7 @@ function buildOption(): echarts.EChartsCoreOption {
         formatTooltip(params as AxisTooltipParam[], bars),
     },
     legend: {
-      data: ['K线', 'MA5', 'MA10', 'MA20'],
+      data: ['K线', 'MA5', 'MA10', 'MA20', 'MA30', 'MA60'],
       top: 0,
       textStyle: { fontSize: 11 },
     },
@@ -233,6 +237,26 @@ function buildOption(): echarts.EChartsCoreOption {
         zlevel: 1,
       },
       {
+        name: 'MA30',
+        type: 'line',
+        data: ma30,
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        symbol: 'none',
+        lineStyle: { width: 1, color: MA30_COLOR },
+        zlevel: 1,
+      },
+      {
+        name: 'MA60',
+        type: 'line',
+        data: ma60,
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        symbol: 'none',
+        lineStyle: { width: 1, color: MA60_COLOR },
+        zlevel: 1,
+      },
+      {
         name: '成交量',
         type: 'bar',
         data: volData,
@@ -259,6 +283,8 @@ function formatTooltip(params: AxisTooltipParam[], bars: Bar[]): string {
     MA5: MA5_COLOR,
     MA10: MA10_COLOR,
     MA20: MA20_COLOR,
+    MA30: MA30_COLOR,
+    MA60: MA60_COLOR,
   }
   const maLines: string[] = []
   for (const p of params) {
