@@ -109,6 +109,8 @@ STRATEGY_PRESETS: dict[str, dict[str, list[Any]]] = {
         "bullish_ma5_deviation": [0.005, 0.02],
         "bullish_slope_min": [-1.0, 5.0],
     },  # 3*2*2*2*2*2*2*2 = 384
+    # ── 影线后收阳线 V2（数据驱动优化版，全硬编码常量，无寻优网格）────────────
+    "shadow_yang_v2": {},  # 0
 }
 
 

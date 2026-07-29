@@ -4,7 +4,6 @@ import { computed, ref } from 'vue'
 import { fetchWencaiSearch, formatError } from '../api'
 import { marketLabel } from '../market'
 import type { Market } from '../market'
-import type { WencaiStockItem } from '../types'
 
 type WencaiActionRow = {
   symbol: string
@@ -45,15 +44,16 @@ function toMarket(m: string): Market {
   return 'SZ'
 }
 
-function normalizeRows(rows: WencaiStockItem[]): WencaiActionRow[] {
+function normalizeRows(rows: Record<string, unknown>[]): WencaiActionRow[] {
   return rows.map((row) => {
-    const market = toMarket(row.market)
+    const symbol = String(row.symbol ?? '')
+    const market = toMarket(String(row.market ?? 'SZ'))
     return {
-      symbol: row.symbol,
+      symbol,
       market,
-      name: row.name || '--',
-      stockReason: row.stock_reason || '',
-      displaySymbol: `${market}:${row.symbol}`,
+      name: String(row.name ?? '--'),
+      stockReason: String(row.stock_reason ?? ''),
+      displaySymbol: `${market}:${symbol}`,
     }
   })
 }
