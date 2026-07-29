@@ -233,6 +233,8 @@ class Strategy(ABC):
         self._position_size = 0.0
         self._cash = 0.0
         self._datetime_array: NDArray | None = None
+        # 策略诊断信息（如缺少缠论数据），引擎读取后透传到 BacktestResult.diagnostic
+        self._diagnostic: str | None = None
 
     # ── 用户实现方法 ─────────────────────────────────────────────────────────────
 

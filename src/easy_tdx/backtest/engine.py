@@ -104,6 +104,8 @@ class BacktestEngine:
         self._slippage_model = slippage_model
         self._execution_model = execution_model
         self._warmup_bars = max(int(warmup_bars), 0)
+        # 策略诊断信息（init() 中设置，如缺少缠论数据），run() 时合并到结果
+        self._strategy_diagnostic: str | None = None
 
     def run(self, df: pd.DataFrame, chanlun_result: Any | None = None) -> BacktestResult:
         """Run backtest.
@@ -128,9 +130,9 @@ class BacktestEngine:
 
         # Auto-compute chanlun if chanlun_level is set and no manual result
         if chanlun_result is None and self._chanlun_level is not None:
-            from easy_tdx.chanlun.analyser import ChanlunAnalyser
+            from easy_tdx.chanlun.incremental import IncrementalAnalyser
 
-            analyser = ChanlunAnalyser(frequency=self._chanlun_level)
+            analyser = IncrementalAnalyser(frequency=self._chanlun_level)
             chanlun_result = analyser.process_klines(df)
 
         # Step 1: Signal generation
@@ -180,7 +182,16 @@ class BacktestEngine:
             "execution": self._execution,
             "position_mode": self._position_mode,
             "reject_policy": self._reject_policy,
+            "chanlun_level": self._chanlun_level,
         }
+
+        # 合并诊断：策略层（如缺少缠论数据）+ 分析器层（如资金曲线异常）
+        diagnostics: list[str] = []
+        if self._strategy_diagnostic:
+            diagnostics.append(self._strategy_diagnostic)
+        if analyzer.diagnostic:
+            diagnostics.append(analyzer.diagnostic)
+        diagnostic = "; ".join(diagnostics) if diagnostics else None
 
         return BacktestResult(
             performance=performance,
@@ -188,7 +199,7 @@ class BacktestEngine:
             trades=trades_df,
             positions=tracker.positions,
             config=config,
-            diagnostic=analyzer.diagnostic,
+            diagnostic=diagnostic,
         )
 
     def _execute_with_model(self, signals: list[Signal], df: pd.DataFrame) -> list[Trade]:
@@ -277,6 +288,9 @@ class BacktestEngine:
 
         # Call init
         strat._call_init()
+
+        # 捕获策略诊断（如缺少缠论数据导致 0 信号）
+        self._strategy_diagnostic = getattr(strat, "_diagnostic", None)
 
         # Generate signals bar by bar
         all_signals: list[Signal] = []

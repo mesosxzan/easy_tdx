@@ -66,6 +66,10 @@ class ChanlunResult:
     mmds: list[MMD] = field(default_factory=list)
     bcs: list[BC] = field(default_factory=list)
     macd: dict[str, list[float]] = field(default_factory=dict)
+    # signals_by_bar: 增量分析器填充，key=确认bar的K线index, value=该bar新确认的MMD列表。
+    # 批量分析器不填充此字段（默认空dict），策略检测到非空时使用增量信号，
+    # 否则回退到批量信号提取逻辑。
+    signals_by_bar: dict[int, list[MMD]] = field(default_factory=dict)
 
     def _fmt_dt(self, dt: datetime) -> str:
         """按 frequency 自适应格式化日期。
@@ -226,12 +230,13 @@ class ChanlunAnalyser:
         xds = find_xds(bis, self._config)
         self._result.xds = xds
 
-        # Step 8: 买卖点识别
-        mmds = find_mmds(bis, zss, self._config)
+        # Step 8: 买卖点识别（传入MACD柱状图启用力度比较和回拉零轴过滤）
+        macd_hist = self._result.macd.get("hist", [])
+        mmds = find_mmds(bis, zss, self._config, macd_hist)
         self._result.mmds = mmds
 
-        # Step 9: 背驰判断
-        bcs = check_bi_beichi(bis, zss, self._config)
+        # Step 9: 背驰判断（传入MACD柱状图启用面积比较）
+        bcs = check_bi_beichi(bis, zss, self._config, macd_hist)
         self._result.bcs = bcs
 
         return self._result

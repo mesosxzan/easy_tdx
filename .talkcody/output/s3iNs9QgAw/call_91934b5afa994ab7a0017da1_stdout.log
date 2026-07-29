@@ -1,0 +1,619 @@
+====================================================================================================
+  缠论三类买点策略 — 参数优化
+  股票池: 9 只 | K线: 800 根 | 资金: 1,000,000 元
+====================================================================================================
+
+>> Step 1: 获取股票数据
+  获取 贵州茅台(600519) ... OK (800 bars)
+  获取 五粮液(000858) ... OK (800 bars)
+  获取 泸州老窖(000568) ... OK (800 bars)
+  获取 水井坊(600779) ... OK (800 bars)
+  获取 古井贡酒(000596) ... OK (800 bars)
+  获取 洋河股份(002304) ... OK (800 bars)
+  获取 酒鬼酒(000799) ... OK (800 bars)
+  获取 今世缘(603369) ... OK (800 bars)
+  获取 山西汾酒(600809) ... OK (800 bars)
+
+  成功获取 9/9 只股票数据
+
+>> Step 2: Phase 1 — 逐参数扫描 (26 组)
+
+[Phase1 1/26] baseline(仅缠论卖点)
+    贵州茅台   ret= +77.68%  trades= 66
+    五粮液    ret= +41.61%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +78.36%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret= +97.88%  trades= 58
+    山西汾酒   ret= +78.07%  trades= 56
+  => AVG ret=+87.70%  dd=18.89%  sharpe=0.972  win=64.6%  trades=62.2
+
+[Phase1 2/26] stop_loss_pct=3
+    贵州茅台   ret= +45.11%  trades= 66
+    五粮液    ret=  +8.12%  trades= 64
+    泸州老窖   ret= +93.59%  trades= 64
+    水井坊    ret= +59.06%  trades= 56
+    古井贡酒   ret=+180.81%  trades= 68
+    洋河股份   ret= +81.58%  trades= 70
+    酒鬼酒    ret= +61.76%  trades= 60
+    今世缘    ret=+101.55%  trades= 62
+    山西汾酒   ret= +62.23%  trades= 56
+  => AVG ret=+77.09%  dd=14.79%  sharpe=0.932  win=61.0%  trades=62.9
+
+[Phase1 3/26] stop_loss_pct=5
+    贵州茅台   ret= +53.69%  trades= 66
+    五粮液    ret= +13.02%  trades= 64
+    泸州老窖   ret= +93.04%  trades= 64
+    水井坊    ret= +60.57%  trades= 56
+    古井贡酒   ret=+166.05%  trades= 68
+    洋河股份   ret= +80.46%  trades= 70
+    酒鬼酒    ret= +50.88%  trades= 60
+    今世缘    ret= +95.19%  trades= 60
+    山西汾酒   ret= +75.29%  trades= 56
+  => AVG ret=+76.46%  dd=17.53%  sharpe=0.924  win=63.4%  trades=62.7
+
+[Phase1 4/26] stop_loss_pct=8
+    贵州茅台   ret= +51.22%  trades= 66
+    五粮液    ret=  +6.34%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +51.70%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +78.56%  trades= 70
+    酒鬼酒    ret= +76.37%  trades= 60
+    今世缘    ret= +98.07%  trades= 60
+    山西汾酒   ret= +93.38%  trades= 56
+  => AVG ret=+83.47%  dd=17.19%  sharpe=0.945  win=63.7%  trades=62.4
+
+[Phase1 5/26] stop_loss_pct=10
+    贵州茅台   ret= +44.39%  trades= 66
+    五粮液    ret= +51.06%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +48.95%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +67.03%  trades= 70
+    酒鬼酒    ret= +70.08%  trades= 60
+    今世缘    ret= +83.45%  trades= 60
+    山西汾酒   ret= +88.35%  trades= 56
+  => AVG ret=+83.22%  dd=18.55%  sharpe=0.953  win=64.0%  trades=62.4
+
+[Phase1 6/26] stop_loss_pct=15
+    贵州茅台   ret= +77.68%  trades= 66
+    五粮液    ret= +41.28%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +78.36%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret= +94.26%  trades= 58
+    山西汾酒   ret= +75.77%  trades= 56
+  => AVG ret=+87.01%  dd=18.93%  sharpe=0.967  win=64.6%  trades=62.2
+
+[Phase1 7/26] take_profit_pct=10
+    贵州茅台   ret= +81.13%  trades= 66
+    五粮液    ret= +21.28%  trades= 64
+    泸州老窖   ret= +43.60%  trades= 64
+    水井坊    ret= +46.62%  trades= 56
+    古井贡酒   ret=+120.40%  trades= 66
+    洋河股份   ret= +46.58%  trades= 70
+    酒鬼酒    ret= +73.19%  trades= 60
+    今世缘    ret= +47.37%  trades= 58
+    山西汾酒   ret= +38.83%  trades= 56
+  => AVG ret=+57.67%  dd=18.43%  sharpe=0.765  win=64.6%  trades=62.2
+
+[Phase1 8/26] take_profit_pct=15
+    贵州茅台   ret= +90.99%  trades= 66
+    五粮液    ret= +25.70%  trades= 64
+    泸州老窖   ret= +58.93%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+113.82%  trades= 66
+    洋河股份   ret= +57.40%  trades= 70
+    酒鬼酒    ret= +78.27%  trades= 60
+    今世缘    ret= +53.71%  trades= 58
+    山西汾酒   ret= +38.83%  trades= 56
+  => AVG ret=+63.01%  dd=18.44%  sharpe=0.818  win=64.6%  trades=62.2
+
+[Phase1 9/26] take_profit_pct=20
+    贵州茅台   ret= +99.65%  trades= 66
+    五粮液    ret= +38.53%  trades= 64
+    泸州老窖   ret= +58.93%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+136.31%  trades= 66
+    洋河股份   ret= +64.99%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret= +53.71%  trades= 58
+    山西汾酒   ret= +53.05%  trades= 56
+  => AVG ret=+69.47%  dd=18.56%  sharpe=0.870  win=64.6%  trades=62.2
+
+[Phase1 10/26] take_profit_pct=30
+    贵州茅台   ret= +77.68%  trades= 66
+    五粮液    ret= +53.36%  trades= 64
+    泸州老窖   ret= +75.84%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+161.15%  trades= 66
+    洋河股份   ret= +80.53%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret= +68.70%  trades= 58
+    山西汾酒   ret= +53.05%  trades= 56
+  => AVG ret=+76.71%  dd=18.68%  sharpe=0.910  win=64.6%  trades=62.2
+
+[Phase1 11/26] take_profit_pct=50
+    贵州茅台   ret= +77.68%  trades= 66
+    五粮液    ret= +41.61%  trades= 64
+    泸州老窖   ret= +94.35%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +78.36%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret= +97.88%  trades= 58
+    山西汾酒   ret= +78.07%  trades= 56
+  => AVG ret=+86.29%  dd=18.89%  sharpe=0.963  win=64.6%  trades=62.2
+
+[Phase1 12/26] trailing_stop_pct=3
+    贵州茅台   ret= +44.52%  trades= 68
+    五粮液    ret= +11.50%  trades= 64
+    泸州老窖   ret= +79.02%  trades= 64
+    水井坊    ret= +53.27%  trades= 56
+    古井贡酒   ret=+144.19%  trades= 68
+    洋河股份   ret= +86.75%  trades= 70
+    酒鬼酒    ret= +55.70%  trades= 60
+    今世缘    ret=+132.64%  trades= 62
+    山西汾酒   ret= +42.54%  trades= 56
+  => AVG ret=+72.24%  dd=13.45%  sharpe=0.907  win=59.6%  trades=63.1
+
+[Phase1 13/26] trailing_stop_pct=5
+    贵州茅台   ret= +55.31%  trades= 66
+    五粮液    ret= +13.02%  trades= 64
+    泸州老窖   ret= +86.20%  trades= 64
+    水井坊    ret= +51.30%  trades= 56
+    古井贡酒   ret=+153.95%  trades= 68
+    洋河股份   ret= +80.46%  trades= 70
+    酒鬼酒    ret= +65.67%  trades= 60
+    今世缘    ret= +96.46%  trades= 62
+    山西汾酒   ret= +52.81%  trades= 56
+  => AVG ret=+72.80%  dd=15.81%  sharpe=0.901  win=62.5%  trades=62.9
+
+[Phase1 14/26] trailing_stop_pct=8
+    贵州茅台   ret= +51.10%  trades= 66
+    五粮液    ret=  +6.61%  trades= 64
+    泸州老窖   ret=+107.16%  trades= 64
+    水井坊    ret= +51.70%  trades= 56
+    古井贡酒   ret=+175.94%  trades= 66
+    洋河股份   ret= +78.56%  trades= 70
+    酒鬼酒    ret= +55.80%  trades= 60
+    今世缘    ret= +92.00%  trades= 62
+    山西汾酒   ret= +93.38%  trades= 56
+  => AVG ret=+79.14%  dd=18.00%  sharpe=0.912  win=63.1%  trades=62.7
+
+[Phase1 15/26] trailing_stop_pct=10
+    贵州茅台   ret= +44.39%  trades= 66
+    五粮液    ret= +47.72%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +48.60%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +73.47%  trades= 70
+    酒鬼酒    ret= +80.57%  trades= 60
+    今世缘    ret= +79.22%  trades= 62
+    山西汾酒   ret= +88.35%  trades= 56
+  => AVG ret=+84.22%  dd=18.04%  sharpe=0.968  win=63.8%  trades=62.7
+
+[Phase1 16/26] trailing_stop_pct=15
+    贵州茅台   ret= +72.34%  trades= 66
+    五粮液    ret= +28.30%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +73.35%  trades= 70
+    酒鬼酒    ret= +70.08%  trades= 60
+    今世缘    ret= +94.88%  trades= 60
+    山西汾酒   ret= +75.77%  trades= 56
+  => AVG ret=+84.42%  dd=19.91%  sharpe=0.948  win=64.4%  trades=62.4
+
+[Phase1 17/26] ma_exit_period=3
+    贵州茅台   ret= +21.62%  trades= 68
+    五粮液    ret= +57.28%  trades= 64
+    泸州老窖   ret=+103.04%  trades= 64
+    水井坊    ret= +47.48%  trades= 56
+    古井贡酒   ret=+150.16%  trades= 68
+    洋河股份   ret= +84.65%  trades= 70
+    酒鬼酒    ret= +14.71%  trades= 60
+    今世缘    ret= +49.27%  trades= 62
+    山西汾酒   ret= +45.33%  trades= 56
+  => AVG ret=+63.73%  dd=8.01%  sharpe=0.963  win=51.8%  trades=63.1
+
+[Phase1 18/26] ma_exit_period=5
+    贵州茅台   ret= +20.92%  trades= 68
+    五粮液    ret= +59.42%  trades= 64
+    泸州老窖   ret=+117.86%  trades= 64
+    水井坊    ret= +33.78%  trades= 56
+    古井贡酒   ret=+134.20%  trades= 68
+    洋河股份   ret= +74.52%  trades= 70
+    酒鬼酒    ret=  +5.80%  trades= 60
+    今世缘    ret=+113.26%  trades= 62
+    山西汾酒   ret= +50.28%  trades= 56
+  => AVG ret=+67.78%  dd=7.17%  sharpe=0.992  win=56.8%  trades=63.1
+
+[Phase1 19/26] ma_exit_period=10
+    贵州茅台   ret= +27.09%  trades= 68
+    五粮液    ret= +54.57%  trades= 64
+    泸州老窖   ret= +56.90%  trades= 64
+    水井坊    ret= +33.00%  trades= 56
+    古井贡酒   ret= +40.72%  trades= 68
+    洋河股份   ret= +22.11%  trades= 70
+    酒鬼酒    ret= +34.72%  trades= 60
+    今世缘    ret= +59.50%  trades= 62
+    山西汾酒   ret=  +7.77%  trades= 56
+  => AVG ret=+37.38%  dd=5.04%  sharpe=0.882  win=66.0%  trades=63.1
+
+[Phase1 20/26] ma_exit_period=20
+    贵州茅台   ret= +21.24%  trades= 68
+    五粮液    ret= +44.84%  trades= 64
+    泸州老窖   ret= +45.00%  trades= 64
+    水井坊    ret= +25.79%  trades= 56
+    古井贡酒   ret= +43.39%  trades= 68
+    洋河股份   ret= +10.93%  trades= 70
+    酒鬼酒    ret= +26.45%  trades= 60
+    今世缘    ret= +37.16%  trades= 62
+    山西汾酒   ret=  +9.82%  trades= 56
+  => AVG ret=+29.40%  dd=5.98%  sharpe=0.688  win=67.1%  trades=63.1
+
+[Phase1 21/26] max_hold_days=10
+    贵州茅台   ret= +53.23%  trades= 68
+    五粮液    ret= +18.89%  trades= 64
+    泸州老窖   ret=+111.41%  trades= 64
+    水井坊    ret= +47.22%  trades= 56
+    古井贡酒   ret=+178.65%  trades= 68
+    洋河股份   ret= +75.57%  trades= 70
+    酒鬼酒    ret= +69.03%  trades= 60
+    今世缘    ret= +95.07%  trades= 62
+    山西汾酒   ret= +81.41%  trades= 56
+  => AVG ret=+81.16%  dd=17.90%  sharpe=0.937  win=64.8%  trades=63.1
+
+[Phase1 22/26] max_hold_days=20
+    贵州茅台   ret= +95.96%  trades= 68
+    五粮液    ret= +32.37%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+200.38%  trades= 68
+    洋河股份   ret= +78.36%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret=+100.88%  trades= 62
+    山西汾酒   ret= +79.84%  trades= 56
+  => AVG ret=+90.55%  dd=18.49%  sharpe=0.993  win=64.4%  trades=63.1
+
+[Phase1 23/26] max_hold_days=30
+    贵州茅台   ret= +85.55%  trades= 66
+    五粮液    ret= +41.61%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+184.45%  trades= 66
+    洋河股份   ret= +78.36%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret= +98.51%  trades= 60
+    山西汾酒   ret= +78.07%  trades= 56
+  => AVG ret=+88.19%  dd=19.11%  sharpe=0.978  win=64.7%  trades=62.4
+
+[Phase1 24/26] max_hold_days=40
+    贵州茅台   ret= +77.68%  trades= 66
+    五粮液    ret= +41.61%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +78.36%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret=+112.83%  trades= 60
+    山西汾酒   ret= +78.07%  trades= 56
+  => AVG ret=+89.36%  dd=18.35%  sharpe=0.985  win=64.4%  trades=62.4
+
+[Phase1 25/26] trailing_stop_pct=10, use_chanlun_sell=False
+    贵州茅台   ret= -29.28%  trades= 19
+    五粮液    ret= -24.62%  trades= 24
+    泸州老窖   ret= -27.53%  trades= 36
+    水井坊    ret= -53.01%  trades= 28
+    古井贡酒   ret= -15.34%  trades= 36
+    洋河股份   ret= -46.80%  trades= 32
+    酒鬼酒    ret= -33.23%  trades= 38
+    今世缘    ret= -27.35%  trades= 34
+    山西汾酒   ret=  -9.34%  trades= 28
+  => AVG ret=-29.61%  dd=45.82%  sharpe=-0.459  win=22.5%  trades=30.6
+
+[Phase1 26/26] max_hold_days=20, use_chanlun_sell=False
+    贵州茅台   ret=  -3.33%  trades= 40
+    五粮液    ret= -10.81%  trades= 40
+    泸州老窖   ret= -19.87%  trades= 40
+    水井坊    ret= -34.27%  trades= 30
+    古井贡酒   ret= -35.55%  trades= 38
+    洋河股份   ret= -31.22%  trades= 40
+    酒鬼酒    ret= -57.20%  trades= 34
+    今世缘    ret= -19.67%  trades= 40
+    山西汾酒   ret= -28.49%  trades= 34
+  => AVG ret=-26.71%  dd=41.64%  sharpe=-0.481  win=43.1%  trades=37.3
+
+  Phase 1 耗时: 20.5s
+
+====================================================================================================
+  Phase 1 结果
+====================================================================================================
+Rank  Params                                                    AvgRet    AvgDD   Sharpe  WinRate  Trades
+----------------------------------------------------------------------------------------------------
+1     max_hold_days=20                                         +90.55%   18.49%    0.993    64.4%    63.1
+2     max_hold_days=40                                         +89.36%   18.35%    0.985    64.4%    62.4
+3     max_hold_days=30                                         +88.19%   19.11%    0.978    64.7%    62.4
+4     baseline(仅缠论卖点)                                          +87.70%   18.89%    0.972    64.6%    62.2
+5     stop_loss_pct=15                                         +87.01%   18.93%    0.967    64.6%    62.2
+6     take_profit_pct=50                                       +86.29%   18.89%    0.963    64.6%    62.2
+7     trailing_stop_pct=15                                     +84.42%   19.91%    0.948    64.4%    62.4
+8     trailing_stop_pct=10                                     +84.22%   18.04%    0.968    63.8%    62.7
+9     stop_loss_pct=8                                          +83.47%   17.19%    0.945    63.7%    62.4
+10    stop_loss_pct=10                                         +83.22%   18.55%    0.953    64.0%    62.4
+11    max_hold_days=10                                         +81.16%   17.90%    0.937    64.8%    63.1
+12    trailing_stop_pct=8                                      +79.14%   18.00%    0.912    63.1%    62.7
+13    stop_loss_pct=3                                          +77.09%   14.79%    0.932    61.0%    62.9
+14    take_profit_pct=30                                       +76.71%   18.68%    0.910    64.6%    62.2
+15    stop_loss_pct=5                                          +76.46%   17.53%    0.924    63.4%    62.7
+16    trailing_stop_pct=5                                      +72.80%   15.81%    0.901    62.5%    62.9
+17    trailing_stop_pct=3                                      +72.24%   13.45%    0.907    59.6%    63.1
+18    take_profit_pct=20                                       +69.47%   18.56%    0.870    64.6%    62.2
+19    ma_exit_period=5                                         +67.78%    7.17%    0.992    56.8%    63.1
+20    ma_exit_period=3                                         +63.73%    8.01%    0.963    51.8%    63.1
+21    take_profit_pct=15                                       +63.01%   18.44%    0.818    64.6%    62.2
+22    take_profit_pct=10                                       +57.67%   18.43%    0.765    64.6%    62.2
+23    ma_exit_period=10                                        +37.38%    5.04%    0.882    66.0%    63.1
+24    ma_exit_period=20                                        +29.40%    5.98%    0.688    67.1%    63.1
+25    max_hold_days=20, use_chanlun_sell=False                 -26.71%   41.64%   -0.481    43.1%    37.3
+26    trailing_stop_pct=10, use_chanlun_sell=False             -29.61%   45.82%   -0.459    22.5%    30.6
+
+  --- 逐股明细 (Top 5 参数组合) ---
+
+  #1: max_hold_days=20
+    贵州茅台  (600519) ret= +95.96%  trades= 68  dd=11.24%
+    五粮液   (000858) ret= +32.37%  trades= 64  dd=33.88%
+    泸州老窖  (000568) ret=+107.04%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+200.38%  trades= 68  dd=9.19%
+    洋河股份  (002304) ret= +78.36%  trades= 70  dd=20.56%
+    酒鬼酒   (000799) ret= +70.67%  trades= 60  dd=21.13%
+    今世缘   (603369) ret=+100.88%  trades= 62  dd=24.95%
+    山西汾酒  (600809) ret= +79.84%  trades= 56  dd=18.88%
+
+  #2: max_hold_days=40
+    贵州茅台  (600519) ret= +77.68%  trades= 66  dd=14.12%
+    五粮液   (000858) ret= +41.61%  trades= 64  dd=29.27%
+    泸州老窖  (000568) ret=+107.04%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+188.58%  trades= 66  dd=12.42%
+    洋河股份  (002304) ret= +78.36%  trades= 70  dd=20.56%
+    酒鬼酒   (000799) ret= +70.67%  trades= 60  dd=21.13%
+    今世缘   (603369) ret=+112.83%  trades= 60  dd=22.14%
+    山西汾酒  (600809) ret= +78.07%  trades= 56  dd=18.88%
+
+  #3: max_hold_days=30
+    贵州茅台  (600519) ret= +85.55%  trades= 66  dd=15.09%
+    五粮液   (000858) ret= +41.61%  trades= 64  dd=29.27%
+    泸州老窖  (000568) ret=+107.04%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+184.45%  trades= 66  dd=13.77%
+    洋河股份  (002304) ret= +78.36%  trades= 70  dd=20.56%
+    酒鬼酒   (000799) ret= +70.67%  trades= 60  dd=21.13%
+    今世缘   (603369) ret= +98.51%  trades= 60  dd=26.68%
+    山西汾酒  (600809) ret= +78.07%  trades= 56  dd=18.88%
+
+  #4: baseline(仅缠论卖点)
+    贵州茅台  (600519) ret= +77.68%  trades= 66  dd=14.12%
+    五粮液   (000858) ret= +41.61%  trades= 64  dd=29.27%
+    泸州老窖  (000568) ret=+107.04%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+188.58%  trades= 66  dd=12.42%
+    洋河股份  (002304) ret= +78.36%  trades= 70  dd=20.56%
+    酒鬼酒   (000799) ret= +70.67%  trades= 60  dd=21.13%
+    今世缘   (603369) ret= +97.88%  trades= 58  dd=26.96%
+    山西汾酒  (600809) ret= +78.07%  trades= 56  dd=18.88%
+
+  #5: stop_loss_pct=15
+    贵州茅台  (600519) ret= +77.68%  trades= 66  dd=14.12%
+    五粮液   (000858) ret= +41.28%  trades= 64  dd=29.43%
+    泸州老窖  (000568) ret=+107.04%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+188.58%  trades= 66  dd=12.42%
+    洋河股份  (002304) ret= +78.36%  trades= 70  dd=20.56%
+    酒鬼酒   (000799) ret= +70.67%  trades= 60  dd=21.13%
+    今世缘   (603369) ret= +94.26%  trades= 58  dd=26.96%
+    山西汾酒  (600809) ret= +75.77%  trades= 56  dd=19.14%
+
+>> Step 3: Phase 2 — 组合优化
+  stop_loss_pct 最佳值: [15, 8] (returns: ['+87.01%', '+83.47%'])
+  take_profit_pct 最佳值: [50, 30] (returns: ['+86.29%', '+76.71%'])
+  trailing_stop_pct 最佳值: [15, 10] (returns: ['+84.42%', '+84.22%'])
+  ma_exit_period 最佳值: [5, 3] (returns: ['+67.78%', '+63.73%'])
+  max_hold_days 最佳值: [20, 40] (returns: ['+90.55%', '+89.36%'])
+  use_chanlun_sell 最佳值: [False, False] (returns: ['-26.71%', '-29.61%'])
+
+  生成 8 组合参数
+
+[Phase2 1/8] stop_loss_pct=15, take_profit_pct=50, ma_exit_period=5, trailing_stop_pct=15, max_hold_days=20, use_chanlun_sell=False
+    贵州茅台   ret= +13.10%  trades= 68
+    五粮液    ret= +42.97%  trades= 64
+    泸州老窖   ret= +73.21%  trades= 64
+    水井坊    ret= +17.94%  trades= 56
+    古井贡酒   ret= +96.27%  trades= 68
+    洋河股份   ret= +45.82%  trades= 70
+    酒鬼酒    ret=  -6.51%  trades= 60
+    今世缘    ret= +79.28%  trades= 62
+    山西汾酒   ret= +37.88%  trades= 56
+  => AVG ret=+44.44%  dd=9.89%  sharpe=0.589  win=52.9%  trades=63.1
+
+[Phase2 2/8] stop_loss_pct=15, take_profit_pct=50
+    贵州茅台   ret= +77.68%  trades= 66
+    五粮液    ret= +41.28%  trades= 64
+    泸州老窖   ret= +94.35%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +78.36%  trades= 70
+    酒鬼酒    ret= +70.67%  trades= 60
+    今世缘    ret= +94.26%  trades= 58
+    山西汾酒   ret= +75.77%  trades= 56
+  => AVG ret=+85.60%  dd=18.93%  sharpe=0.957  win=64.6%  trades=62.2
+
+[Phase2 3/8] take_profit_pct=50, trailing_stop_pct=15
+    贵州茅台   ret= +72.34%  trades= 66
+    五粮液    ret= +28.30%  trades= 64
+    泸州老窖   ret= +94.35%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +73.35%  trades= 70
+    酒鬼酒    ret= +70.08%  trades= 60
+    今世缘    ret= +94.88%  trades= 60
+    山西汾酒   ret= +75.77%  trades= 56
+  => AVG ret=+83.01%  dd=19.91%  sharpe=0.938  win=64.4%  trades=62.4
+
+[Phase2 4/8] stop_loss_pct=15, trailing_stop_pct=15
+    贵州茅台   ret= +72.34%  trades= 66
+    五粮液    ret= +28.30%  trades= 64
+    泸州老窖   ret=+107.04%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +73.35%  trades= 70
+    酒鬼酒    ret= +70.08%  trades= 60
+    今世缘    ret= +94.88%  trades= 60
+    山西汾酒   ret= +75.77%  trades= 56
+  => AVG ret=+84.42%  dd=19.91%  sharpe=0.948  win=64.4%  trades=62.4
+
+[Phase2 5/8] stop_loss_pct=15, take_profit_pct=50, trailing_stop_pct=15
+    贵州茅台   ret= +72.34%  trades= 66
+    五粮液    ret= +28.30%  trades= 64
+    泸州老窖   ret= +94.35%  trades= 64
+    水井坊    ret= +49.42%  trades= 56
+    古井贡酒   ret=+188.58%  trades= 66
+    洋河股份   ret= +73.35%  trades= 70
+    酒鬼酒    ret= +70.08%  trades= 60
+    今世缘    ret= +94.88%  trades= 60
+    山西汾酒   ret= +75.77%  trades= 56
+  => AVG ret=+83.01%  dd=19.91%  sharpe=0.938  win=64.4%  trades=62.4
+
+[Phase2 6/8] stop_loss_pct=15, take_profit_pct=50, ma_exit_period=5, trailing_stop_pct=15, max_hold_days=20, use_chanlun_sell=False
+    贵州茅台   ret= +13.10%  trades= 68
+    五粮液    ret= +42.97%  trades= 64
+    泸州老窖   ret= +73.21%  trades= 64
+    水井坊    ret= +17.94%  trades= 56
+    古井贡酒   ret= +96.27%  trades= 68
+    洋河股份   ret= +45.82%  trades= 70
+    酒鬼酒    ret=  -6.51%  trades= 60
+    今世缘    ret= +79.28%  trades= 62
+    山西汾酒   ret= +37.88%  trades= 56
+  => AVG ret=+44.44%  dd=9.89%  sharpe=0.589  win=52.9%  trades=63.1
+
+[Phase2 7/8] stop_loss_pct=15, take_profit_pct=50, ma_exit_period=5, trailing_stop_pct=15, max_hold_days=20, use_chanlun_sell=False
+    贵州茅台   ret= +13.10%  trades= 68
+    五粮液    ret= +42.97%  trades= 64
+    泸州老窖   ret= +73.21%  trades= 64
+    水井坊    ret= +17.94%  trades= 56
+    古井贡酒   ret= +96.27%  trades= 68
+    洋河股份   ret= +45.82%  trades= 70
+    酒鬼酒    ret=  -6.51%  trades= 60
+    今世缘    ret= +79.28%  trades= 62
+    山西汾酒   ret= +37.88%  trades= 56
+  => AVG ret=+44.44%  dd=9.89%  sharpe=0.589  win=52.9%  trades=63.1
+
+[Phase2 8/8] stop_loss_pct=8, take_profit_pct=30, ma_exit_period=3, trailing_stop_pct=10, max_hold_days=40, use_chanlun_sell=False
+    贵州茅台   ret= +12.41%  trades= 68
+    五粮液    ret= +47.13%  trades= 64
+    泸州老窖   ret= +48.50%  trades= 64
+    水井坊    ret= +34.07%  trades= 56
+    古井贡酒   ret= +93.56%  trades= 68
+    洋河股份   ret= +81.73%  trades= 70
+    酒鬼酒    ret= +11.13%  trades= 60
+    今世缘    ret= +36.36%  trades= 62
+    山西汾酒   ret= +16.80%  trades= 56
+  => AVG ret=+42.41%  dd=9.68%  sharpe=0.641  win=46.9%  trades=63.1
+
+  Phase 2 耗时: 6.5s
+
+====================================================================================================
+  Phase 2 结果（含 Phase 1 baseline 对比）
+====================================================================================================
+Rank  Params                                                    AvgRet    AvgDD   Sharpe  WinRate  Trades
+----------------------------------------------------------------------------------------------------
+1     stop_loss_pct=15, take_profit_pct=50                     +85.60%   18.93%    0.957    64.6%    62.2
+2     stop_loss_pct=15, trailing_stop_pct=15                   +84.42%   19.91%    0.948    64.4%    62.4
+3     take_profit_pct=50, trailing_stop_pct=15                 +83.01%   19.91%    0.938    64.4%    62.4
+4     stop_loss_pct=15, take_profit_pct=50, trailing_stop_pct=15  +83.01%   19.91%    0.938    64.4%    62.4
+5     stop_loss_pct=15, take_profit_pct=50, ma_exit_period=5, trailing_stop_pct=15, max_hold_days=20, use_chanlun_sell=False  +44.44%    9.89%    0.589    52.9%    63.1
+6     stop_loss_pct=15, take_profit_pct=50, ma_exit_period=5, trailing_stop_pct=15, max_hold_days=20, use_chanlun_sell=False  +44.44%    9.89%    0.589    52.9%    63.1
+7     stop_loss_pct=15, take_profit_pct=50, ma_exit_period=5, trailing_stop_pct=15, max_hold_days=20, use_chanlun_sell=False  +44.44%    9.89%    0.589    52.9%    63.1
+8     stop_loss_pct=8, take_profit_pct=30, ma_exit_period=3, trailing_stop_pct=10, max_hold_days=40, use_chanlun_sell=False  +42.41%    9.68%    0.641    46.9%    63.1
+
+  --- 逐股明细 (Top 5 参数组合) ---
+
+  #1: stop_loss_pct=15, take_profit_pct=50
+    贵州茅台  (600519) ret= +77.68%  trades= 66  dd=14.12%
+    五粮液   (000858) ret= +41.28%  trades= 64  dd=29.43%
+    泸州老窖  (000568) ret= +94.35%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+188.58%  trades= 66  dd=12.42%
+    洋河股份  (002304) ret= +78.36%  trades= 70  dd=20.56%
+    酒鬼酒   (000799) ret= +70.67%  trades= 60  dd=21.13%
+    今世缘   (603369) ret= +94.26%  trades= 58  dd=26.96%
+    山西汾酒  (600809) ret= +75.77%  trades= 56  dd=19.14%
+
+  #2: stop_loss_pct=15, trailing_stop_pct=15
+    贵州茅台  (600519) ret= +72.34%  trades= 66  dd=14.25%
+    五粮液   (000858) ret= +28.30%  trades= 64  dd=35.92%
+    泸州老窖  (000568) ret=+107.04%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+188.58%  trades= 66  dd=12.42%
+    洋河股份  (002304) ret= +73.35%  trades= 70  dd=22.79%
+    酒鬼酒   (000799) ret= +70.08%  trades= 60  dd=21.39%
+    今世缘   (603369) ret= +94.88%  trades= 60  dd=26.68%
+    山西汾酒  (600809) ret= +75.77%  trades= 56  dd=19.14%
+
+  #3: take_profit_pct=50, trailing_stop_pct=15
+    贵州茅台  (600519) ret= +72.34%  trades= 66  dd=14.25%
+    五粮液   (000858) ret= +28.30%  trades= 64  dd=35.92%
+    泸州老窖  (000568) ret= +94.35%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+188.58%  trades= 66  dd=12.42%
+    洋河股份  (002304) ret= +73.35%  trades= 70  dd=22.79%
+    酒鬼酒   (000799) ret= +70.08%  trades= 60  dd=21.39%
+    今世缘   (603369) ret= +94.88%  trades= 60  dd=26.68%
+    山西汾酒  (600809) ret= +75.77%  trades= 56  dd=19.14%
+
+  #4: stop_loss_pct=15, take_profit_pct=50, trailing_stop_pct=15
+    贵州茅台  (600519) ret= +72.34%  trades= 66  dd=14.25%
+    五粮液   (000858) ret= +28.30%  trades= 64  dd=35.92%
+    泸州老窖  (000568) ret= +94.35%  trades= 64  dd=11.50%
+    水井坊   (600779) ret= +49.42%  trades= 56  dd=15.12%
+    古井贡酒  (000596) ret=+188.58%  trades= 66  dd=12.42%
+    洋河股份  (002304) ret= +73.35%  trades= 70  dd=22.79%
+    酒鬼酒   (000799) ret= +70.08%  trades= 60  dd=21.39%
+    今世缘   (603369) ret= +94.88%  trades= 60  dd=26.68%
+    山西汾酒  (600809) ret= +75.77%  trades= 56  dd=19.14%
+
+  #5: stop_loss_pct=15, take_profit_pct=50, ma_exit_period=5, trailing_stop_pct=15, max_hold_days=20, use_chanlun_sell=False
+    贵州茅台  (600519) ret= +13.10%  trades= 68  dd=6.34%
+    五粮液   (000858) ret= +42.97%  trades= 64  dd=9.73%
+    泸州老窖  (000568) ret= +73.21%  trades= 64  dd=9.12%
+    水井坊   (600779) ret= +17.94%  trades= 56  dd=8.36%
+    古井贡酒  (000596) ret= +96.27%  trades= 68  dd=7.33%
+    洋河股份  (002304) ret= +45.82%  trades= 70  dd=11.71%
+    酒鬼酒   (000799) ret=  -6.51%  trades= 60  dd=15.52%
+    今世缘   (603369) ret= +79.28%  trades= 62  dd=10.37%
+    山西汾酒  (600809) ret= +37.88%  trades= 56  dd=10.50%
+
+====================================================================================================
+  ★ 最优参数组合 ★
+====================================================================================================
+  参数: max_hold_days=20
+  平均收益率: +90.55%
+  平均最大回撤: 18.49%
+  平均夏普比率: 0.993
+  平均胜率: 64.4%
+  平均交易次数: 63.1
+
+  完整参数:
+    stop_loss_pct: 0
+    take_profit_pct: 0
+    ma_exit_period: 0
+    trailing_stop_pct: 0
+    max_hold_days: 20
+    use_chanlun_sell: True

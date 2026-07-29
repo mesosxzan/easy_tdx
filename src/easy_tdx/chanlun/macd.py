@@ -85,7 +85,7 @@ def calc_macd_force(
         fast, slow, signal: MACD 参数
 
     Returns:
-        {"hist_sum": 总柱子面积, "hist_up_sum": 红柱总和, "hist_down_sum": 绿柱总和}
+        {\"hist_sum\": 总柱子面积, \"hist_up_sum\": 红柱总和, \"hist_down_sum\": 绿柱总和}
     """
     if start_idx > end_idx or end_idx >= len(closes):
         return {"hist_sum": 0.0, "hist_up_sum": 0.0, "hist_down_sum": 0.0}
@@ -102,3 +102,72 @@ def calc_macd_force(
         "hist_up_sum": sum(hist_up),
         "hist_down_sum": abs(sum(hist_down)),
     }
+
+
+# ── 笔级别 MACD 力度计算（参考 chanlun-pro query_macd_ld） ─────────────────
+
+
+def calc_bi_macd_force(
+    hist: list[float],
+    bi_start_kidx: int,
+    bi_end_kidx: int,
+    direction: str,
+) -> float:
+    """计算单笔的 MACD 力度。
+
+    参考 chanlun-pro 的力度比较规则：
+    - 向上段取 MACD 红柱（正柱）之和
+    - 向下段取 MACD 绿柱（负柱）绝对值之和
+
+    Args:
+        hist: MACD 柱状图序列（完整K线的 hist）
+        bi_start_kidx: 笔起始分型的 K 线 index
+        bi_end_kidx: 笔结束分型的 K 线 index
+        direction: 笔方向 \"up\" 或 \"down\"
+
+    Returns:
+        MACD 力度值（始终为正数，值越大力度越强）
+    """
+    if bi_start_kidx > bi_end_kidx or bi_end_kidx >= len(hist):
+        return 0.0
+
+    start = max(0, bi_start_kidx)
+    end = min(len(hist) - 1, bi_end_kidx)
+    hist_slice = hist[start : end + 1]
+
+    if direction == "up":
+        # 向上笔：红柱（正柱）之和
+        return sum(h for h in hist_slice if h > 0)
+    else:
+        # 向下笔：绿柱（负柱）绝对值之和
+        return abs(sum(h for h in hist_slice if h < 0))
+
+
+def check_macd_cross_zero(
+    hist: list[float],
+    start_idx: int,
+    end_idx: int,
+) -> bool:
+    """检查区间内 MACD 柱状图是否穿越零轴（回拉零轴）。
+
+    参考 chanlun-pro judge_macd_back_zero：中枢形成期间 MACD 必须穿过零轴，
+    表示中枢有完整的动能转换过程。未穿越零轴的中枢视为弱中枢，过滤其信号。
+
+    Args:
+        hist: MACD 柱状图序列
+        start_idx: 起始 K 线 index
+        end_idx: 结束 K 线 index（含）
+
+    Returns:
+        True 如果区间内 hist 发生了正负号变化（穿越零轴）
+    """
+    if start_idx > end_idx or end_idx >= len(hist):
+        return False
+
+    start = max(0, start_idx)
+    end = min(len(hist) - 1, end_idx)
+
+    has_positive = any(h > 0 for h in hist[start : end + 1])
+    has_negative = any(h < 0 for h in hist[start : end + 1])
+
+    return has_positive and has_negative

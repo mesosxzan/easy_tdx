@@ -92,8 +92,8 @@ def _parse_code_args(args: tuple[str, ...]) -> tuple[str, str]:
 @click.option(
     "--chanlun-level",
     "chanlun_level",
-    default=None,
-    help="自动计算缠论分析并注入策略（如 DAILY/30MIN）",
+    default="DAILY",
+    help="自动计算缠论分析并注入策略（如 DAILY/30MIN），默认 DAILY",
 )
 @click.option("--table", "use_table", is_flag=True, default=True, help="表格输出（默认）")
 @click.option("--json", "use_json", is_flag=True, default=False, help="JSON 输出")
@@ -113,7 +113,7 @@ def backtest(
     adjust: str,
     count: int,
     indicators: str | None,
-    chanlun_level: str | None,
+    chanlun_level: str,
     use_table: bool,
     use_json: bool,
     output_fmt: str | None,
@@ -128,7 +128,7 @@ def backtest(
 
       easy-tdx backtest 000001 --strategy-file my_strategy.py --indicators MACD,KDJ
 
-      easy-tdx backtest 000001 --strategy-file chanlun_strategy.py --chanlun-level DAILY
+      easy-tdx backtest 000001 --strategy-file chanlun_strategy.py
 
       easy-tdx backtest 000001 \\
         --combo-strategies strategies/macd_cross.py,strategies/rsi_reversal.py \\
@@ -402,8 +402,8 @@ def _print_table(result: Any, df: Any = None) -> None:
 @click.option(
     "--chanlun-level",
     "chanlun_level",
-    default=None,
-    help="自动计算缠论分析并注入策略（如 DAILY/30MIN）",
+    default="DAILY",
+    help="自动计算缠论分析并注入策略（如 DAILY/30MIN），默认 DAILY",
 )
 @click.option("--table", "use_table", is_flag=True, help="表格输出")
 @click.option("--output", "output_fmt", type=click.Choice(["json", "table", "csv"]), default="json")
@@ -417,7 +417,7 @@ def portfolio(
     adjust: str,
     count: int,
     allocation: str,
-    chanlun_level: str | None,
+    chanlun_level: str,
     use_table: bool,
     output_fmt: str,
 ) -> None:
