@@ -16,6 +16,7 @@ from easy_tdx.backtest.strategies.registry import (
     ParametrizedStrategy,
     register_strategy,
 )
+from easy_tdx.backtest.strategy import crossover
 from easy_tdx.MyTT import (
     ATR,
     BBI,
@@ -36,6 +37,7 @@ from easy_tdx.MyTT import (
     TAQ,
     TRIX,
     WR,
+    ZHUOYAO,
 )
 
 __all__: list[str] = []  # 注册副作用即可，无需导出符号
@@ -473,6 +475,184 @@ class TrixStrategy(ParametrizedStrategy):
             self.buy()
         elif self.dead[i] and self.position["size"] > 0:
             self.sell()
+
+
+# ── TRIX 交叉优化版 ───────────────────────────────────────────────────────────
+
+
+@register_strategy(
+    name="trix_cross_optimized",
+    label="TRIX 交叉（优化版）",
+    description="TRIX 金叉买入 + MA60 趋势过滤 + 均线发散波动率过滤 + 动态离场"
+    "（MA15 快线止盈 / ATR 吊灯止损）。三重过滤减少震荡市假信号，适合中长线趋势跟踪。",
+)
+class TrixCrossOptimizedStrategy(ParametrizedStrategy):
+    """TRIX 三重平滑趋势策略（优化版）。
+
+    在 TRIX 金叉信号基础上增加三重过滤机制：
+
+    **入场条件（全部满足）：**
+      1. TRIX 上穿信号线（金叉）
+      2. 收盘价 > MA60（趋势过滤：仅多头趋势中做多）
+      3. (MA_fast - MA_slow) > 过去 ``volatility_lookback`` 日 (MA_fast-MA_slow) 均值
+         （波动率过滤：确保均线发散，过滤粘合震荡）
+
+    **离场条件（任一触发即卖出）：**
+      ① 快线止盈：收盘价 < MA15，且 (MA_fast - MA_mid) > 过去 ``volatility_lookback``
+         日 (MA_fast-MA_mid) 均值（确保均线发散时才止盈，过滤粘合震荡假信号）
+      ② ATR 吊灯止损：收盘价 < 持仓最高价 - ATR(atr_period) × chandelier_atr_mult
+         （基于 ATR 的动态止损，自适应各股票波动率，避免固定百分比在不同
+         波动率股票上表现不一致的问题）
+
+    与 ``trix`` 策略的区别：
+    - 趋势过滤（MA60）避免逆势建仓
+    - 波动率过滤（均线发散度）过滤震荡市假金叉
+    - 动态离场（MA15 快线止盈 + ATR 吊灯止损）替代简单死叉，锁定利润并控制回撤
+    - ATR 吊灯止损自适应波动率：高波动股票止损更宽，低波动股票止损更窄
+
+    参数优化结论（30 只 A 股 × 800 日回测）：
+    - MA60 趋势过滤优于 MA120（更多入场机会，收益 +10.3% vs +6.8%）
+    - MA15 快线止盈为最优（MA5 过于敏感，MA20 在 ma_fast=ma_slow 时退化）
+    - ATR 倍数 5.0 为最佳平衡点（≥6.0 时吊灯止损失效，退化为纯快线止盈）
+    - 波动率回溯 20 日最优（放松至 40/60/99 日反而降低收益）
+    """
+
+    # MA120 需 120 根 bar 预热（支持 ma_trend_period 上限 250 的场景）
+    default_warmup_bars = 120
+
+    params = [
+        Param("m1", int, default=12, min_value=2, max_value=30, label="TRIX周期"),
+        Param("m2", int, default=20, min_value=5, max_value=60, label="信号周期"),
+        Param(
+            "ma_trend_period",
+            int,
+            default=60,
+            min_value=20,
+            max_value=250,
+            label="趋势均线周期",
+            description="收盘价需站上此均线才允许做多（默认 MA60）",
+        ),
+        Param(
+            "ma_fast",
+            int,
+            default=15,
+            min_value=2,
+            max_value=30,
+            label="快线周期",
+            description="快线 MA，用于波动率过滤和快线止盈（默认 MA15）",
+        ),
+        Param(
+            "ma_mid",
+            int,
+            default=20,
+            min_value=5,
+            max_value=60,
+            label="中线周期",
+            description="中线 MA，用于离场波动率过滤（默认 MA20）",
+        ),
+        Param(
+            "ma_slow",
+            int,
+            default=20,
+            min_value=10,
+            max_value=120,
+            label="慢线周期",
+            description="慢线 MA，用于入场波动率过滤（默认 MA20）",
+        ),
+        Param(
+            "volatility_lookback",
+            int,
+            default=20,
+            min_value=5,
+            max_value=60,
+            label="波动率回溯周期",
+            description="均线差值的移动平均窗口（默认 20 日）",
+        ),
+        Param(
+            "atr_period",
+            int,
+            default=20,
+            min_value=5,
+            max_value=50,
+            label="ATR 周期",
+            description="ATR 计算周期，用于吊灯止损（默认 20 日）",
+        ),
+        Param(
+            "chandelier_atr_mult",
+            float,
+            default=5.0,
+            min_value=1.0,
+            max_value=10.0,
+            label="ATR 吊灯倍数",
+            description="吊灯止损距离 = ATR × 此倍数（默认 5.0，越大止损越宽）",
+        ),
+    ]
+
+    def init(self) -> None:
+        # TRIX 指标 + 金叉信号
+        self.trix, self.trma = self.I(TRIX, self.data.close, self.p["m1"], self.p["m2"])
+        self.golden = self.I(crossover, self.trix, self.trma)
+
+        # 趋势过滤均线
+        self.ma_trend = self.I(MA, self.data.close, self.p["ma_trend_period"])
+
+        # 波动率过滤均线
+        self.ma_fast = self.I(MA, self.data.close, self.p["ma_fast"])
+        self.ma_mid = self.I(MA, self.data.close, self.p["ma_mid"])
+        self.ma_slow = self.I(MA, self.data.close, self.p["ma_slow"])
+
+        # 均线差值及其移动平均（波动率过滤核心）
+        # 入场过滤：MA_fast - MA_slow 的发散度
+        self._diff_entry = self.ma_fast - self.ma_slow
+        self._diff_entry_avg = self.I(MA, self._diff_entry, self.p["volatility_lookback"])
+
+        # 离场过滤：MA_fast - MA_mid 的发散度
+        self._diff_exit = self.ma_fast - self.ma_mid
+        self._diff_exit_avg = self.I(MA, self._diff_exit, self.p["volatility_lookback"])
+
+        # ATR 吊灯止损：持仓期间最高价 + ATR
+        self.atr = self.I(
+            ATR, self.data.close, self.data.high, self.data.low, self.p["atr_period"]
+        )
+        self._peak_price: float = 0.0
+
+    def next(self) -> None:
+        i = self._bar_index
+        close = self.data.close[0]
+        high = self.data.high[0]
+
+        if self.position["size"] == 0:
+            # ── 空仓：检查入场条件 ──────────────────────────────────────────
+            # 1. TRIX 金叉
+            # 2. 趋势过滤：收盘价 > MA60
+            # 3. 波动率过滤：MA_fast - MA_slow > 其移动平均（均线发散）
+            if (
+                self.golden[i]
+                and close > self.ma_trend[i]
+                and self._diff_entry[i] > self._diff_entry_avg[i]
+            ):
+                self.buy()
+                self._peak_price = high
+        else:
+            # ── 持仓：更新峰值，检查离场条件 ────────────────────────────────
+            if high > self._peak_price:
+                self._peak_price = high
+
+            # 离场条件①：快线止盈 - 收盘价 < MA_fast 且均线发散
+            fast_line_exit = (
+                close < self.ma_fast[i]
+                and self._diff_exit[i] > self._diff_exit_avg[i]
+            )
+
+            # 离场条件②：ATR 吊灯止损 - 收盘价 < 持仓最高价 - ATR × 倍数
+            chandelier_exit = (
+                self._peak_price > 0
+                and close < self._peak_price - self.atr[i] * self.p["chandelier_atr_mult"]
+            )
+
+            if fast_line_exit or chandelier_exit:
+                self.sell()
+                self._peak_price = 0.0
 
 
 # ── EMV 简易波动 ──────────────────────────────────────────────────────────────
@@ -1112,3 +1292,97 @@ class ShadowYangStrategy(ParametrizedStrategy):
             return 0.0
         pct_change = (ma_now - ma_prev) / ma_prev * 100
         return math.degrees(math.atan(pct_change))
+
+
+# ── 捉妖大师多周期共振 ───────────────────────────────────────────────────────
+
+
+@register_strategy(
+    name="zhuoyao",
+    label="捉妖大师多周期共振",
+    description="基于 ZHUOYAO 指标（短/中/长周期涨幅及指数平滑），"
+    "通过三周期趋势共振判断买卖时机。"
+    "入场：短线涨幅>0 且 趋势>0 且 短线>中线（三周期共振确认强势）；"
+    "出场：短线转弱 或 趋势转向（任一即卖，保守预警）。"
+    "适合单边趋势行情，震荡市信号较少（过滤噪音设计）。",
+)
+class ZhuoyaoStrategy(ParametrizedStrategy):
+    """捉妖大师多周期共振策略。
+
+    基于 ZHUOYAO 指标的多周期趋势共振：
+    - LONG: N1 日涨幅的 EMA 平滑（长线趋势）
+    - MID: N2 日涨幅（中线趋势）
+    - SHORT: N3 日涨幅（短线动能）
+    - TREND: MID 的 EMA 平滑（中期趋势平滑）
+
+    入场条件（三条件全部满足）：
+      1. SHORT > 0  - 短线涨幅为正，短期处于强势
+      2. TREND > 0  - 中期趋势向上
+      3. SHORT > MID - 短线强于中线，处于加速阶段（非衰竭）
+
+    出场条件（任一触发即卖出）：
+      1. SHORT < 0  - 短线转弱
+      2. TREND < 0  - 中期趋势转向
+    """
+
+    # N1=120 需至少 120 根 bar 预热
+    default_warmup_bars = 120
+
+    params = [
+        Param(
+            "n1",
+            int,
+            default=120,
+            min_value=60,
+            max_value=250,
+            label="长线周期",
+            description="长线涨幅计算周期（默认 120 日），用于 LONG 线",
+        ),
+        Param(
+            "n2",
+            int,
+            default=60,
+            min_value=30,
+            max_value=120,
+            label="中线周期",
+            description="中线涨幅计算周期（默认 60 日），用于 MID 线",
+        ),
+        Param(
+            "n3",
+            int,
+            default=20,
+            min_value=5,
+            max_value=60,
+            label="短线周期",
+            description="短线涨幅计算周期（默认 20 日），用于 SHORT 线",
+        ),
+        Param(
+            "m",
+            int,
+            default=10,
+            min_value=2,
+            max_value=30,
+            label="EMA平滑周期",
+            description="LONG 和 TREND 线的 EMA 平滑周期（默认 10）",
+        ),
+    ]
+
+    def init(self) -> None:
+        self.long, self.mid, self.short, self.trend = self.I(
+            ZHUOYAO, self.data.close, self.p["n1"], self.p["n2"], self.p["n3"], self.p["m"]
+        )
+
+    def next(self) -> None:
+        i = self._bar_index
+        short = self.short[i]
+        mid = self.mid[i]
+        trend = self.trend[i]
+
+        if self.position["size"] == 0:
+            # 入场：短线强势 + 中期趋势向上 + 短线加速（短>中）
+            if short > 0 and trend > 0 and short > mid:
+                self.buy()
+        else:
+            # 出场：短线转弱 或 中期趋势转向（任一即卖）
+            if short < 0 or trend < 0:
+                self.sell()

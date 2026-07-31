@@ -22,7 +22,7 @@ else:
 class PerformanceAnalyzer:
     """绩效分析器。
 
-    从资金曲线和交易记录计算 19 项绩效指标。
+    从资金曲线和交易记录计算 20 项绩效指标。
 
     Attributes:
         ANNUAL_DAYS: 年化交易日数（默认 252）
@@ -37,6 +37,7 @@ class PerformanceAnalyzer:
         equity_curve: pd.DataFrame,
         trades: pd.DataFrame,
         risk_free_rate: float = 0.03,
+        close_prices: NDArray | None = None,
     ) -> None:
         """初始化分析器。
 
@@ -44,10 +45,13 @@ class PerformanceAnalyzer:
             equity_curve: 资金曲线 DataFrame，必须包含 total 和 drawdown 列
             trades: 交易记录 DataFrame，必须包含 direction, pnl, rejected 列
             risk_free_rate: 无风险利率（默认 3%）
+            close_prices: 标的收盘价数组（与 equity_curve 等长），用于计算
+                买入持有收益率。为 None 时 buy_hold_return 记为 0.0。
         """
         self._equity_curve = equity_curve
         self._trades = trades
         self._risk_free_rate = risk_free_rate
+        self._close_prices = close_prices
         # 数据异常诊断（资金曲线不足/恒定时填充），供上层透出给用户
         self.diagnostic: str | None = None
 
@@ -55,7 +59,7 @@ class PerformanceAnalyzer:
         """计算绩效指标。
 
         Returns:
-            包含 19 项指标的字典：
+            包含 20 项指标的字典：
             - total_return: 总收益率
             - annual_return: 年化收益率
             - max_drawdown: 最大回撤
@@ -75,6 +79,7 @@ class PerformanceAnalyzer:
             - max_loss: 最大亏损
             - avg_holding_days: 平均持仓天数（简化为固定值 5.0）
             - volatility: 年化波动率
+            - buy_hold_return: 买入持有收益率
         """
         # 边界检查
         if len(self._equity_curve) < 2:
@@ -211,6 +216,9 @@ class PerformanceAnalyzer:
         # 19. 年化波动率
         volatility = np.std(daily_ret) * np.sqrt(self.ANNUAL_DAYS)
 
+        # 20. 买入持有收益率（以首根收盘价买入、末根收盘价卖出的收益率）
+        buy_hold_return = self._compute_buy_hold_return()
+
         return {
             "total_return": total_return,
             "annual_return": annual_return,
@@ -231,6 +239,7 @@ class PerformanceAnalyzer:
             "max_loss": max_loss,
             "avg_holding_days": avg_holding_days,
             "volatility": volatility,
+            "buy_hold_return": buy_hold_return,
             # 别名键（兼容常见叫法，避免 .get('sharpe_ratio') 等误用返回 0）
             "sharpe_ratio": sharpe,
             "start_cash": float(total[0]),
@@ -310,6 +319,24 @@ class PerformanceAnalyzer:
             return 0.0
         return total_days / total_size
 
+    def _compute_buy_hold_return(self) -> float:
+        """计算买入持有收益率。
+
+        以回测区间首根收盘价全仓买入、末根收盘价卖出，收益率为
+        ``(last_close / first_close) - 1``。需在 ``__init__`` 时传入
+        ``close_prices``，未传入或数据不足时返回 0.0。
+
+        Returns:
+            买入持有收益率（小数，如 0.15 = +15%）
+        """
+        if self._close_prices is None or len(self._close_prices) < 2:
+            return 0.0
+        first_close = float(self._close_prices[0])
+        last_close = float(self._close_prices[-1])
+        if first_close <= 0:
+            return 0.0
+        return (last_close / first_close) - 1
+
     def _compute_max_dd_duration(self, total: NDArray, drawdown: NDArray) -> int:
         """计算最大回撤持续时间。
 
@@ -371,6 +398,7 @@ class PerformanceAnalyzer:
             "max_loss": 0.0,
             "avg_holding_days": 0.0,
             "volatility": 0.0,
+            "buy_hold_return": 0.0,
             "sharpe_ratio": 0.0,
             "start_cash": 0.0,
             "end_value": 0.0,

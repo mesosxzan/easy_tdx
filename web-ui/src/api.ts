@@ -21,6 +21,7 @@ import type {
   TaskListResponse,
   TaskState,
   TaskSubmitResponse,
+  WencaiBacktestRequest,
   WencaiSearchRequest,
   WencaiCookieResponse,
 } from './types'
@@ -107,6 +108,18 @@ export async function fetchBars(
     return bars
 }
 
+/** 获取单只股票名称（通过 MAC 行情接口，返回 name 字段）。 */
+export async function fetchStockName(market: string, code: string): Promise<string> {
+  const params = new URLSearchParams({ market, code })
+  const resp = await fetch(`${BASE}/mac/quote?${params}`)
+  if (!resp.ok) await throwError(resp)
+  const body = (await resp.json()) as { data: Record<string, unknown>[] }
+  if (body.data.length > 0 && body.data[0].name) {
+    return String(body.data[0].name)
+  }
+  return ''
+}
+
 /** 问财语义搜索（默认用于 A 股选股结果）。 */
 export async function fetchWencaiSearch(
   req: WencaiSearchRequest,
@@ -182,6 +195,19 @@ export async function submitMultiStrategyTask(
   req: MultiStrategyBacktestRequest,
 ): Promise<TaskSubmitResponse> {
   const resp = await fetch(`${BASE}/backtest/multi-strategy/run/async`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+  })
+  if (!resp.ok) await throwError(resp)
+  return (await resp.json()) as TaskSubmitResponse
+}
+
+/** 提交问财选股批量回测后台任务，返回 task_id。 */
+export async function submitWencaiBacktestTask(
+  req: WencaiBacktestRequest,
+): Promise<TaskSubmitResponse> {
+  const resp = await fetch(`${BASE}/backtest/wencai/run/async`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),

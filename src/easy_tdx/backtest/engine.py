@@ -172,6 +172,7 @@ class BacktestEngine:
             tracker.equity_curve,
             trades_df,
             risk_free_rate=0.03,
+            close_prices=df["close"].to_numpy(dtype=float),
         )
         performance = analyzer.compute()
 

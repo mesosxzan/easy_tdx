@@ -29,6 +29,8 @@ const symbolPicker = ref<InstanceType<typeof SymbolPicker> | null>(null)
 // 初始值与 SymbolPicker 默认一致；onMounted 时若 URL query 带了寻优页传来的值则覆盖。
 const code = ref('000001')
 const category = ref<Category>('DAY')
+// 数据来源模式（与 SymbolPicker 双向同步）：问财模式下回测按钮移至搜索栏旁
+const source = ref<'manual' | 'wencai'>('manual')
 function isoDaysFromNow(days: number): string {
   const d = new Date()
   d.setDate(d.getDate() + days)
@@ -216,7 +218,19 @@ async function onSave() {
           v-model:category="category"
           v-model:start-date="startDate"
           v-model:end-date="endDate"
-        />
+          v-model:source="source"
+        >
+          <!-- 问财模式下：回测按钮与问财搜索按钮并排，免去滚到底部 -->
+          <template #wencai-actions>
+            <button
+              class="primary run-inline-btn"
+              :disabled="store.running"
+              @click="onRun"
+            >
+              {{ store.running ? '回测中…' : '开始回测' }}
+            </button>
+          </template>
+        </SymbolPicker>
       </section>
 
       <section class="panel-section">
@@ -255,6 +269,7 @@ async function onSave() {
       </section>
 
       <button
+        v-if="source === 'manual'"
         class="primary run-btn"
         :disabled="store.running"
         @click="onRun"
@@ -279,7 +294,11 @@ async function onSave() {
 
         <section class="report-section">
           <h3>K线 · 均线 · 成交量 · 买卖点</h3>
-          <KlineChart :bars="store.ohlcv" :trades="store.result.trades" />
+          <KlineChart
+            :bars="store.ohlcv"
+            :trades="store.result.trades"
+            :title="`${fullSymbol(code)} ${store.stockName}`.trim()"
+          />
         </section>
 
         <section class="report-section">
@@ -378,6 +397,11 @@ async function onSave() {
   width: 100%;
   padding: 10px;
   font-size: 14px;
+}
+/* 问财搜索行内的回测按钮（紧凑型，与问财搜索按钮并排） */
+.run-inline-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* 右栏报告面板 */

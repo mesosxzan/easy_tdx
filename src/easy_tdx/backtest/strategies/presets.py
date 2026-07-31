@@ -87,6 +87,13 @@ STRATEGY_PRESETS: dict[str, dict[str, list[Any]]] = {
         "m1": [12, 18],
         "m2": [12, 20, 30],
     },  # 6
+    "trix_cross_optimized": {
+        "m1": [12, 18],
+        "m2": [12, 20, 30],
+        "ma_fast": [10, 15],
+        "chandelier_atr_mult": [3.0, 4.0, 5.0, 6.0],
+        "ma_trend_period": [60, 120],
+    },  # 2*3*2*4*2 = 96
     "emv": {
         "n": [10, 14, 20, 28],
     },  # 4

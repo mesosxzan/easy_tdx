@@ -409,6 +409,7 @@ const comboPerf = computed<Performance | null>(() => {
     max_loss: get('max_loss'),
     avg_holding_days: get('avg_holding_days'),
     volatility: get('volatility'),
+    buy_hold_return: get('buy_hold_return'),
   }
 })
 

@@ -73,6 +73,55 @@ export interface WencaiSearchResponse {
   count: number
 }
 
+// ── 问财批量回测（POST /api/v1/backtest/wencai/run/async） ─────────────────────
+
+/** 问财批量回测请求（后端先搜索再逐个独立回测）。 */
+export interface WencaiBacktestRequest {
+  query: string
+  top?: number
+  strategy: string
+  params?: Record<string, number | string | boolean>
+  cash?: number
+  commission?: number
+  slippage?: number
+  execution?: ExecutionMode
+  category?: Category
+  count?: number
+  start_date?: string
+  end_date?: string
+}
+
+/** 问财批量回测中单只标的的结果。 */
+export interface WencaiBacktestStockResult {
+  symbol: string
+  market: string
+  name: string
+  performance: Partial<Performance>
+  error: string | null
+}
+
+/** 问财批量回测汇总统计。 */
+export interface WencaiBacktestSummary {
+  avg_return: number
+  avg_sharpe: number
+  avg_max_drawdown: number
+  positive_count: number
+  negative_count: number
+  best: { symbol: string; name: string; return: number } | null
+  worst: { symbol: string; name: string; return: number } | null
+}
+
+/** 问财批量回测完整结果。 */
+export interface WencaiBacktestResult {
+  query: string
+  top: number
+  strategy: string
+  stocks_searched: number
+  stocks_backtested: number
+  results: WencaiBacktestStockResult[]
+  summary: WencaiBacktestSummary
+}
+
 // ── 回测请求（POST /api/v1/backtest/run） ─────────────────────────────────────
 
 export type ExecutionMode = 'next_open' | 'next_close'
@@ -117,6 +166,7 @@ export interface Performance {
   max_loss: number
   avg_holding_days: number
   volatility: number
+  buy_hold_return: number
 }
 
 export interface EquityPoint {
@@ -159,7 +209,7 @@ export type TaskStatus = 'pending' | 'running' | 'done' | 'failed'
 export interface TaskState {
   task_id: string
   status: TaskStatus
-  result: BacktestResult | PortfolioResult | OptimizeResult | OptimizeAllResult | null
+  result: BacktestResult | PortfolioResult | OptimizeResult | OptimizeAllResult | WencaiBacktestResult | null
   error: string | null
   description: string
   elapsed: number

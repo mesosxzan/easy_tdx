@@ -57,6 +57,17 @@ async def auction(
     return _df_resp(df)
 
 
+@router.get("/mac/quote", response_model=DataFrameResponse)
+async def stock_quote(
+    market: str = Query(..., description="市场: SZ, SH, BJ"),
+    code: str = Query(..., min_length=6, max_length=6, description="6位股票代码"),
+    client: Any = Depends(get_mac_client),
+) -> DataFrameResponse:
+    """获取单只股票实时行情（含名称，供前端展示标的名称）。"""
+    df = await client.get_stock_quotes([(market_value_from_str(market), code)])
+    return _df_resp(df)
+
+
 @router.get("/mac/unusual", response_model=DataFrameResponse)
 async def unusual(
     market: str = Query(..., description="市场: SZ, SH"),

@@ -1,0 +1,372 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> strategies/eval_trix_optimized.py:37:1
+   |
+35 |   sys.path.insert(0, str(PROJECT_ROOT))
+36 |
+37 | / from easy_tdx.backtest.engine import BacktestEngine  # noqa: E402
+38 | | from easy_tdx.backtest.strategies import get_registry  # noqa: E402
+39 | | from easy_tdx.cli.conn import get_mac_client  # noqa: E402
+40 | | from easy_tdx.mac.enums import Adjust, Period  # noqa: E402
+41 | | from easy_tdx.models.enums import Market  # noqa: E402
+42 | |
+43 | | # 触发内置策略注册（import 副作用）
+44 | | import easy_tdx.backtest.strategies.builtin  # noqa: E402, F401
+   | |___________________________________________^
+45 |
+46 |   # ── 评测标的池（覆盖不同行业/市值/风格） ─────────────────────────────────────
+   |
+help: Organize imports
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> strategies/eval_trix_param_sweep.py:35:1
+   |
+33 |   sys.path.insert(0, str(PROJECT_ROOT))
+34 |
+35 | / from easy_tdx.backtest.engine import BacktestEngine  # noqa: E402
+36 | | from easy_tdx.backtest.strategies import get_registry  # noqa: E402
+37 | | from easy_tdx.cli.conn import get_mac_client  # noqa: E402
+38 | | from easy_tdx.mac.enums import Adjust, Period  # noqa: E402
+39 | | from easy_tdx.models.enums import Market  # noqa: E402
+40 | |
+41 | | # 触发内置策略注册
+42 | | import easy_tdx.backtest.strategies.builtin  # noqa: E402, F401
+   | |___________________________________________^
+43 |
+44 |   # ── 标的池（与 eval_trix_optimized.py 一致） ──────────────────────────────────
+   |
+help: Organize imports
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep.py:147:27
+    |
+145 |                     print(f"OK ({len(df)} 根)")
+146 |                 else:
+147 |                     print(f"SKIP (K线不足)")
+    |                           ^^^^^^^^^^^^^^^^^
+148 |             except Exception as exc:
+149 |                 print(f"ERROR ({exc})")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep.py:303:11
+    |
+302 |     # 基线
+303 |     print(f"\n  --- 基线: 原版 TRIX ---")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+304 |     print(f"  平均收益={orig_ret * 100:+.2f}%  平均回撤={orig_dd * 100:.2f}%  "
+305 |           f"夏普={orig_sharpe:.3f}  胜率={orig_win * 100:.1f}%  "
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep.py:312:11
+    |
+311 |     print(f"\n  --- Top {min(top, len(sorted_combos))} 参数组合（按复合评分排序）---")
+312 |     print(f"  评分 = avg_return - 0.5 × avg_drawdown")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+313 |     print()
+314 |     header = (
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep.py:339:15
+    |
+337 |     best = sorted_combos[0] if sorted_combos else None
+338 |     if best:
+339 |         print(f"\n  --- 最优组合 vs 原版 TRIX ---")
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+340 |         print(f"  最优参数: ATR倍数={best.chandelier_atr_mult}  "
+341 |               f"快线=MA{best.ma_fast}  趋势MA={best.ma_trend_period}")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep.py:366:11
+    |
+365 |     # 按不同维度排序的 Top 3
+366 |     print(f"\n  --- 按不同维度排序的 Top 3 ---")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+367 |
+368 |     for metric, label, fmt in [
+    |
+help: Remove extraneous `f` prefix
+
+E501 Line too long (105 > 100)
+   --> strategies/eval_trix_param_sweep.py:396:97
+    |
+394 |     print(f"            ma_trend_period={MA_TRENDS}")
+395 |     print(f"  总组合数: {len(CHANDELIER_ATR_MULTS) * len(MA_FASTS) * len(MA_TRENDS)}")
+396 |     print(f"  总回测数: {len(CHANDELIER_ATR_MULTS) * len(MA_FASTS) * len(MA_TRENDS) * len(EVAL_STOCKS)}")
+    |                                                                                                     ^^^^^
+397 |     print("  数据源: MAC 客户端（通达信 MAC 协议），前复权日线")
+398 |     print("=" * 140)
+    |
+
+F401 [*] `dataclasses.field` imported but unused
+  --> strategies/eval_trix_param_sweep_v2.py:24:36
+   |
+22 | import sys
+23 | import time
+24 | from dataclasses import dataclass, field
+   |                                    ^^^^^
+25 | from itertools import product
+26 | from pathlib import Path
+   |
+help: Remove unused import: `dataclasses.field`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> strategies/eval_trix_param_sweep_v2.py:33:1
+   |
+31 |   sys.path.insert(0, str(PROJECT_ROOT))
+32 |
+33 | / from easy_tdx.backtest.engine import BacktestEngine  # noqa: E402
+34 | | from easy_tdx.backtest.strategies import get_registry  # noqa: E402
+35 | | from easy_tdx.cli.conn import get_mac_client  # noqa: E402
+36 | | from easy_tdx.mac.enums import Adjust, Period  # noqa: E402
+37 | | from easy_tdx.models.enums import Market  # noqa: E402
+38 | |
+39 | | import easy_tdx.backtest.strategies.builtin  # noqa: E402, F401
+   | |___________________________________________^
+40 |
+41 |   EVAL_STOCKS: list[tuple[str, str, str]] = [
+   |
+help: Organize imports
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v2.py:301:11
+    |
+299 |     print(f"{'=' * 150}")
+300 |
+301 |     print(f"\n  --- 基线: 原版 TRIX ---")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+302 |     print(f"  平均收益={orig_ret * 100:+.2f}%  中位收益={orig_med * 100:+.2f}%  "
+303 |           f"平均回撤={orig_dd * 100:.2f}%  夏普={orig_sharpe:.3f}  "
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v2.py:310:11
+    |
+309 |     print(f"\n  --- Top {min(top, len(sorted_combos))} 参数组合（按复合评分排序）---")
+310 |     print(f"  评分 = avg_return - 0.5 × avg_drawdown\n")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+311 |     header = (
+312 |         f"  {'排名':>4} {'ATR':>5} {'快线':>4} {'中线':>4} {'趋势':>4} "
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v2.py:341:11
+    |
+340 |     # ── 按维度分析 ──
+341 |     print(f"\n  --- 按维度分析 ---")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^
+342 |
+343 |     # ATR 倍数影响（固定 ma_fast=15, ma_mid=20, ma_trend=60）
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v2.py:344:11
+    |
+343 |     # ATR 倍数影响（固定 ma_fast=15, ma_mid=20, ma_trend=60）
+344 |     print(f"\n  [ATR 倍数影响] (固定 MA15, mid20, 趋势MA60)")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+345 |     for atr in CHANDELIER_ATR_MULTS:
+346 |         matching = [c for c in combos if c.chandelier_atr_mult == atr and c.ma_fast == 15 and c.ma_mid == 20 and c.ma_trend_period ==…
+    |
+help: Remove extraneous `f` prefix
+
+E501 Line too long (137 > 100)
+   --> strategies/eval_trix_param_sweep_v2.py:346:101
+    |
+344 | …
+345 | …
+346 | …_atr_mult == atr and c.ma_fast == 15 and c.ma_mid == 20 and c.ma_trend_period == 60]
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+347 | …
+348 | …
+    |
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v2.py:355:11
+    |
+354 |     # ma_mid 影响（固定 atr=6.0, ma_fast=15, ma_trend=60）
+355 |     print(f"\n  [ma_mid 影响] (固定 ATR=6.0, MA15, 趋势MA60)")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+356 |     for mid in MA_MIDS:
+357 |         matching = [c for c in combos if c.chandelier_atr_mult == 6.0 and c.ma_fast == 15 and c.ma_mid == mid and c.ma_trend_period =…
+    |
+help: Remove extraneous `f` prefix
+
+E501 Line too long (138 > 100)
+   --> strategies/eval_trix_param_sweep_v2.py:357:101
+    |
+355 | …)")
+356 | …
+357 | …_atr_mult == 6.0 and c.ma_fast == 15 and c.ma_mid == mid and c.ma_trend_period == 60]
+    |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+358 | …
+359 | …
+    |
+
+E501 Line too long (104 > 100)
+   --> strategies/eval_trix_param_sweep_v2.py:363:97
+    |
+361 |             print(f"    mid={mid:>2}: 收益={c.avg_return * 100:+.2f}%  "
+362 |                   f"回撤={c.avg_drawdown * 100:.2f}%  交易={c.total_trades}  "
+363 |                   f"持仓={c.avg_holding_days:.1f}d  评分={c.composite_score * 100:+.2f}  [{exit_note}]")
+    |                                                                                                     ^^^^
+364 |
+365 |     # 最优 vs 基线
+    |
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v2.py:368:15
+    |
+366 |     best = sorted_combos[0] if sorted_combos else None
+367 |     if best:
+368 |         print(f"\n  --- 最优组合 vs 原版 TRIX ---")
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+369 |         atr_label = "无" if best.chandelier_atr_mult >= 99 else f"{best.chandelier_atr_mult}"
+370 |         print(f"  最优参数: ATR倍数={atr_label}  快线=MA{best.ma_fast}  "
+    |
+help: Remove extraneous `f` prefix
+
+F401 [*] `dataclasses.field` imported but unused
+  --> strategies/eval_trix_param_sweep_v3.py:23:36
+   |
+21 | import sys
+22 | import time
+23 | from dataclasses import dataclass, field
+   |                                    ^^^^^
+24 | from itertools import product
+25 | from pathlib import Path
+   |
+help: Remove unused import: `dataclasses.field`
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> strategies/eval_trix_param_sweep_v3.py:32:1
+   |
+30 |   sys.path.insert(0, str(PROJECT_ROOT))
+31 |
+32 | / from easy_tdx.backtest.engine import BacktestEngine  # noqa: E402
+33 | | from easy_tdx.backtest.strategies import get_registry  # noqa: E402
+34 | | from easy_tdx.cli.conn import get_mac_client  # noqa: E402
+35 | | from easy_tdx.mac.enums import Adjust, Period  # noqa: E402
+36 | | from easy_tdx.models.enums import Market  # noqa: E402
+37 | |
+38 | | import easy_tdx.backtest.strategies.builtin  # noqa: E402, F401
+   | |___________________________________________^
+39 |
+40 |   EVAL_STOCKS: list[tuple[str, str, str]] = [
+   |
+help: Organize imports
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v3.py:231:11
+    |
+229 |     print("  TRIX 优化策略参数扫描 V3 -- 放松入场过滤 + 更高 ATR")
+230 |     print(f"  标的数: {len(EVAL_STOCKS)} 只 | K线: {KLINE_COUNT} 根")
+231 |     print(f"  固定: ma_fast=15, ma_mid=20, ma_trend=60")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+232 |     print(f"  扫描维度: atr_mult={ATR_MULTS}")
+233 |     print(f"            volatility_lookback={VOL_LOOKBACKS} (大值→入场过滤放松)")
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v3.py:235:11
+    |
+233 |     print(f"            volatility_lookback={VOL_LOOKBACKS} (大值→入场过滤放松)")
+234 |     print(f"  总组合数: {total_combos}")
+235 |     print(f"  使用 skip_bounds=True 允许超范围值")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+236 |     print("=" * 140)
+    |
+help: Remove extraneous `f` prefix
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v3.py:291:11
+    |
+289 |     print(f"{'=' * 140}")
+290 |
+291 |     print(f"\n  --- 基线: 原版 TRIX ---")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+292 |     print(f"  平均收益={orig_ret * 100:+.2f}%  中位收益={orig_med * 100:+.2f}%  "
+293 |           f"平均回撤={orig_dd * 100:.2f}%  夏普={orig_sharpe:.3f}  "
+    |
+help: Remove extraneous `f` prefix
+
+E501 Line too long (118 > 100)
+   --> strategies/eval_trix_param_sweep_v3.py:309:97
+    |
+307 |     for rank, cr in enumerate(sorted_combos[:top], 1):
+308 |         marker = " ← " if rank == 1 else "   "
+309 |         filter_note = "放松" if cr.volatility_lookback >= 60 else ("标准" if cr.volatility_lookback == 20 else "中等")
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^
+310 |         print(
+311 |             f"  {rank:>4} {cr.chandelier_atr_mult:>5.1f} {cr.volatility_lookback:>6} "
+    |
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v3.py:322:11
+    |
+321 |     # ── 维度分析 ──
+322 |     print(f"\n  --- ATR 倍数影响 (固定 vol_lb=20) ---")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+323 |     for atr in ATR_MULTS:
+324 |         matching = [c for c in combos if c.chandelier_atr_mult == atr and c.volatility_lookback == 20]
+    |
+help: Remove extraneous `f` prefix
+
+E501 Line too long (102 > 100)
+   --> strategies/eval_trix_param_sweep_v3.py:324:101
+    |
+322 |     print(f"\n  --- ATR 倍数影响 (固定 vol_lb=20) ---")
+323 |     for atr in ATR_MULTS:
+324 |         matching = [c for c in combos if c.chandelier_atr_mult == atr and c.volatility_lookback == 20]
+    |                                                                                                     ^^
+325 |         if matching and matching[0].valid_count > 0:
+326 |             c = matching[0]
+    |
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v3.py:333:11
+    |
+331 |                   f"评分={c.composite_score * 100:+.2f}")
+332 |
+333 |     print(f"\n  --- 波动率回溯影响 (固定 ATR=8.0) ---")
+    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+334 |     for vlb in VOL_LOOKBACKS:
+335 |         matching = [c for c in combos if c.chandelier_atr_mult == 8.0 and c.volatility_lookback == vlb]
+    |
+help: Remove extraneous `f` prefix
+
+E501 Line too long (103 > 100)
+   --> strategies/eval_trix_param_sweep_v3.py:335:101
+    |
+333 |     print(f"\n  --- 波动率回溯影响 (固定 ATR=8.0) ---")
+334 |     for vlb in VOL_LOOKBACKS:
+335 |         matching = [c for c in combos if c.chandelier_atr_mult == 8.0 and c.volatility_lookback == vlb]
+    |                                                                                                     ^^^
+336 |         if matching and matching[0].valid_count > 0:
+337 |             c = matching[0]
+    |
+
+F541 [*] f-string without any placeholders
+   --> strategies/eval_trix_param_sweep_v3.py:348:15
+    |
+346 |     best = sorted_combos[0] if sorted_combos and sorted_combos[0].valid_count > 0 else None
+347 |     if best:
+348 |         print(f"\n  --- 最优组合 vs 原版 TRIX ---")
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+349 |         print(f"  最优参数: ATR={best.chandelier_atr_mult}  vol_lb={best.volatility_lookback}  "
+350 |               f"MA15/MA20/MA60")
+    |
+help: Remove extraneous `f` prefix
+
+Found 30 errors.
+[*] 23 fixable with the `--fix` option.

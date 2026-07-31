@@ -1,5 +1,13 @@
 """影线后收阳线策略 V2（优化版）。
 
+基于 shadow_yang.py 的回测数据驱动优化。本次优化（买入趋势过滤强化）::
+
+  新增 2 项买入过滤条件：
+   24. 5日线须在10日线之上（MA5 > MA10）：短期均线多头排列时才买入，
+       避免在短期趋势向下时入场。
+   25. 股价须在60日均线之上（close > MA60）：中长期趋势向上时才买入，
+       避免在股价跌破长期均线时抄底。
+
 基于 shadow_yang.py 的回测数据驱动优化。本次优化（出场端优化 #22）::
 
   数据驱动分析（50 只个股，139 笔交易，81 胜 58 负，胜率 58.3%，PF 6.18）::
@@ -530,6 +538,15 @@ class ShadowYangStrategy(Strategy):
         # 波动率过滤 - ATR/价格 > 8% 不交易
         atr_now = self._calc_atr(i)
         if cur_close > 0 and atr_now / cur_close * 100 > VOLATILITY_MAX_PCT:
+            return
+
+        # 买入过滤：5日线须在10日线之上（短期趋势向上）
+        # 买入过滤：股价须在60日均线之上（中长期趋势向上）
+        ma10_now = self.ma10[i]
+        ma60_now = self.ma60[i]
+        if ma5_now == ma5_now and ma10_now == ma10_now and ma5_now <= ma10_now:
+            return
+        if ma60_now == ma60_now and cur_close <= ma60_now:
             return
 
         # 趋势过滤 - 收盘价须在 MA20 之上

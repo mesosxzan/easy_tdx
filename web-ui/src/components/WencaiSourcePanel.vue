@@ -16,14 +16,19 @@ type WencaiActionRow = {
 const props = withDefaults(defineProps<{
   mode?: 'single' | 'multi'
   selectedCodes?: string[]
+  showBacktestBtn?: boolean
+  backtestLoading?: boolean
 }>(), {
   mode: 'single',
   selectedCodes: () => [],
+  showBacktestBtn: false,
+  backtestLoading: false,
 })
 
 const emit = defineEmits<{
   pick: [code: string]
   add: [symbol: string]
+  backtest: [query: string]
 }>()
 
 const query = ref('')
@@ -89,6 +94,12 @@ function onUse(row: WencaiActionRow) {
   emit('add', row.displaySymbol)
 }
 
+function onBacktest() {
+  const trimmed = query.value.trim()
+  if (!trimmed) return
+  emit('backtest', trimmed)
+}
+
 function actionLabel(row: WencaiActionRow): string {
   if (props.mode === 'single') return '使用'
   return selectedCodeSet.value.has(row.symbol) ? '已添加' : '加入'
@@ -112,6 +123,16 @@ function isDisabled(row: WencaiActionRow): boolean {
         <button :disabled="loading" @click="search">
           {{ loading ? '搜索中…' : '问财搜索' }}
         </button>
+        <button
+          v-if="showBacktestBtn"
+          class="backtest-btn"
+          :disabled="backtestLoading || !query.trim()"
+          @click="onBacktest"
+        >
+          {{ backtestLoading ? '回测中…' : '批量回测' }}
+        </button>
+        <!-- 父组件可注入额外操作按钮（如单标回测页的「开始回测」） -->
+        <slot name="actions" />
       </div>
       <p class="hint">
         通过同花顺问财结果挑选标的，默认取股票结果前 100 条。首次使用请先到「服务器设置」保存问财 Cookie。
@@ -153,6 +174,18 @@ function isDisabled(row: WencaiActionRow): boolean {
 }
 .search-row input {
   flex: 1;
+}
+.backtest-btn {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  white-space: nowrap;
+}
+.backtest-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.backtest-btn:disabled {
+  opacity: 0.5;
 }
 .hint {
   margin-top: 6px;

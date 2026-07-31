@@ -12,6 +12,7 @@ import {
   submitOptimizeAllTask,
   submitOptimizeTask,
   submitMultiStrategyTask,
+  submitWencaiBacktestTask,
   fetchTask,
 } from '../api'
 import type {
@@ -27,6 +28,8 @@ import type {
   OptimizeBacktestRequest,
   OptimizeResult,
   StrategySchema,
+  WencaiBacktestRequest,
+  WencaiBacktestResult,
 } from '../types'
 
 export const useBacktestStore = defineStore('backtest', () => {
@@ -44,6 +47,7 @@ export const useBacktestStore = defineStore('backtest', () => {
   // ── OHLCV 行情（前端始终持有，回测与 K 线共用） ───────────────────────────
   const ohlcv = ref<Bar[]>([])
   const barsSource = ref<string>('') // 来源描述，如 "SZ:000001 DAY×250"
+  const stockName = ref<string>('') // 标的名称（K线图标题用）
 
   function setOhlcv(bars: Bar[], source: string) {
     ohlcv.value = bars
@@ -159,6 +163,45 @@ export const useBacktestStore = defineStore('backtest', () => {
     error.value = ''
   }
 
+  // ── 问财选股批量回测 ──────────────────────────────────────────────────────
+  const wencaiResult = ref<WencaiBacktestResult | null>(null)
+  const wencaiRunning = ref(false)
+
+  /** 提交问财批量回测后台任务并轮询直到完成。
+   * 后端先调问财搜索获取前 top 只标的，再逐个独立回测并汇总统计。 */
+  async function runWencai(req: WencaiBacktestRequest) {
+    wencaiRunning.value = true
+    error.value = ''
+    wencaiResult.value = null
+    try {
+      const { task_id } = await submitWencaiBacktestTask(req)
+      const start = Date.now()
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const state = await fetchTask(task_id)
+        if (state.status === 'done' && state.result) {
+          wencaiResult.value = state.result as WencaiBacktestResult
+          break
+        }
+        if (state.status === 'failed') {
+          throw new Error(state.error || '问财批量回测失败')
+        }
+        if (Date.now() - start > 300_000) throw new Error('问财批量回测超时（300s）')
+        await new Promise((r) => setTimeout(r, 500))
+      }
+    } catch (e) {
+      error.value = formatError(e)
+      wencaiResult.value = null
+    } finally {
+      wencaiRunning.value = false
+    }
+  }
+
+  function clearWencai() {
+    wencaiResult.value = null
+    error.value = ''
+  }
+
   // ── 参数网格寻优（Phase 4） ─────────────────────────────────────────────
   const optimizeResult = ref<OptimizeResult | null>(null)
   const optimizeRunning = ref(false)
@@ -247,6 +290,7 @@ export const useBacktestStore = defineStore('backtest', () => {
     strategiesLoaded,
     ohlcv,
     barsSource,
+    stockName,
     result,
     running,
     error,
@@ -254,6 +298,8 @@ export const useBacktestStore = defineStore('backtest', () => {
     portfolioRunning,
     multiStrategyResult,
     multiStrategyRunning,
+    wencaiResult,
+    wencaiRunning,
     optimizeResult,
     optimizeRunning,
     optimizeContext,
@@ -270,6 +316,8 @@ export const useBacktestStore = defineStore('backtest', () => {
     clearPortfolio,
     runMultiStrategy,
     clearMultiStrategy,
+    runWencai,
+    clearWencai,
     runOptimize,
     runOptimizeAll,
     setOptimizeContext,

@@ -40,6 +40,7 @@ const BOE_PERF: Performance = {
   max_loss: -0.05,
   avg_holding_days: 11.222,
   volatility: 0.2496,
+  buy_hold_return: 0,
 }
 
 test('京东方回测必须评为 D 档（用户核心诉求验证点）', () => {
@@ -114,6 +115,7 @@ test('用户实测场景：6年6笔交易 + 高夏普 → 应得 A/B（核心回
     max_loss: -0.08,
     avg_holding_days: 365, // 平均持仓 1 年
     volatility: 0.16,
+    buy_hold_return: 0,
   }
   const r = gradePerformance(longTermGood)
   console.log('长线优质策略评级:', r.grade, '分数:', r.score)

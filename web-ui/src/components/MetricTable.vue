@@ -20,6 +20,7 @@ interface MetricRow {
 // 按业务分组排列：收益 / 风险 / 交易
 const METRICS: MetricRow[] = [
   { key: 'total_return', label: '总收益率', format: 'percent', group: '收益' },
+  { key: 'buy_hold_return', label: '买入持有收益', format: 'percent', group: '收益' },
   { key: 'annual_return', label: '年化收益', format: 'percent', group: '收益' },
   { key: 'sharpe', label: '夏普比率', format: 'ratio', group: '收益' },
   { key: 'sortino', label: '索提诺比率', format: 'ratio', group: '收益' },
@@ -63,7 +64,7 @@ function valueClass(row: MetricRow): string {
   if (row.key === 'max_drawdown' || row.key === 'avg_loss' || row.key === 'max_loss') {
     return props.perf[row.key] !== 0 ? 'neg' : ''
   }
-  if (row.key === 'total_return' || row.key === 'annual_return') {
+  if (row.key === 'total_return' || row.key === 'annual_return' || row.key === 'buy_hold_return') {
     return props.perf[row.key] > 0 ? 'pos' : 'neg'
   }
   // win_rate 是 0-1 分数（>=0.5 视为正向）；profit_factor 是绝对比值（>=1 正向）

@@ -308,3 +308,75 @@ class TestNewFactorFilters:
         assert len(buys) == 0, (
             f"小实体阳线（body_ratio < 0.3）不应买入，但产生了 {len(buys)} 笔交易"
         )
+
+
+class TestTrendFilters:
+    """买入趋势过滤测试（MA5 > MA10 / close > MA60）。"""
+
+    def test_trend_filter_code_exists(self) -> None:
+        """买入趋势过滤代码存在。"""
+        path = Path(__file__).parent.parent.parent / "strategies" / "shadow_yang_v2.py"
+        content = path.read_text(encoding="utf-8")
+        # 验证 MA5 > MA10 过滤
+        assert "ma5_now <= ma10_now" in content
+        # 验证 close > MA60 过滤
+        assert "cur_close <= ma60_now" in content
+        # 验证有文档注释说明过滤原因
+        assert "5日线须在10日线之上" in content
+        assert "股价须在60日均线之上" in content
+
+    def test_trend_filter_documentation_exists(self) -> None:
+        """买入趋势过滤在 docstring 中有文档说明。"""
+        path = Path(__file__).parent.parent.parent / "strategies" / "shadow_yang_v2.py"
+        content = path.read_text(encoding="utf-8")
+        assert "买入趋势过滤强化" in content
+        assert "MA5 > MA10" in content
+        assert "close > MA60" in content
+
+    def test_close_below_ma60_filtered(self) -> None:
+        """股价在60日均线之下时不买入（close < MA60）。
+
+        构造前 60 根在 15.0 附近横盘的数据（MA60 ≈ 15.0），然后快速下跌
+        到 10.0 附近，在低位形成影线后收阳形态。此时 close(≈10) 远低于
+        MA60(≈14.5)，应被 close > MA60 过滤条件拦截。
+        """
+        opens: list[float] = []
+        closes: list[float] = []
+        vols: list[float] = []
+
+        # 前 60 根：15.0 附近横盘
+        for i in range(60):
+            opens.append(14.98)
+            closes.append(15.02)
+            vols.append(1000.0)
+
+        # 5 根快速下跌：15.0 -> 10.0
+        for i in range(5):
+            price = 14.0 - i
+            opens.append(round(price + 0.10, 2))
+            closes.append(round(price, 2))
+            vols.append(2000.0)
+
+        # 1 根阴线回调
+        opens.append(10.10)
+        closes.append(9.70)
+        vols.append(1500.0)
+
+        # 1 根阳线收复（影线后收阳买入信号，但 close < MA60）
+        opens.append(9.60)
+        closes.append(10.05)
+        vols.append(1800.0)
+
+        # 后续 5 根
+        for i in range(5):
+            price = 10.10 + i * 0.03
+            opens.append(round(price - 0.02, 2))
+            closes.append(round(price, 2))
+            vols.append(1000.0)
+
+        df = _make_df(opens, closes, vols=vols)
+        buys = _run_backtest(df)
+        # close < MA60 应被过滤，不产生买入
+        assert len(buys) == 0, (
+            f"股价在MA60之下不应买入，但产生了 {len(buys)} 笔交易"
+        )

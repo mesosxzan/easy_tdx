@@ -12,6 +12,7 @@ import type { Bar, Trade } from '../types'
 const props = defineProps<{
   bars: Bar[]
   trades: Trade[]
+  title?: string
 }>()
 
 const container = ref<HTMLDivElement>()
@@ -124,6 +125,12 @@ function buildOption(): echarts.EChartsCoreOption {
 
   return {
     backgroundColor: 'transparent',
+    title: {
+      text: props.title || '',
+      left: 'center',
+      top: 5,
+      textStyle: { fontSize: 13, color: '#e0e0e0' },
+    },
     tooltip: {
       trigger: 'axis',
       axisPointer: {
@@ -135,13 +142,13 @@ function buildOption(): echarts.EChartsCoreOption {
     },
     legend: {
       data: ['K线', 'MA5', 'MA10', 'MA20', 'MA30', 'MA60'],
-      top: 0,
+      top: 28,
       textStyle: { fontSize: 11 },
     },
-    // 双 grid：主图 55% + 间距 5% + 成交量 18% + 底部 dataZoom
+    // 双 grid：主图 52% + 间距 4% + 成交量 18% + 底部 dataZoom
     grid: [
-      { left: '8%', right: '3%', top: '8%', height: '55%' },
-      { left: '8%', right: '3%', top: '68%', height: '18%' },
+      { left: '8%', right: '3%', top: '13%', height: '52%' },
+      { left: '8%', right: '3%', top: '69%', height: '17%' },
     ],
     xAxis: [
       {
@@ -274,7 +281,10 @@ function formatTooltip(params: AxisTooltipParam[], bars: Bar[]): string {
   const bar = bars[idx]
   if (!bar) return ''
 
-  const change = bar.open !== 0 ? ((bar.close - bar.open) / bar.open) * 100 : 0
+  // 涨跌幅 = (今收 - 昨收) / 昨收 × 100%
+  // 昨收 = 前一根 K 线的收盘价；首根无前一根时用 open 近似
+  const prevClose = idx > 0 ? bars[idx - 1].close : bar.open
+  const change = prevClose !== 0 ? ((bar.close - prevClose) / prevClose) * 100 : 0
   const changeColor = change >= 0 ? UP_COLOR : DOWN_COLOR
   const changeStr = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`
 
@@ -318,7 +328,7 @@ onBeforeUnmount(() => {
   chart?.dispose()
   chart = null
 })
-watch(() => [props.bars, props.trades], render)
+watch(() => [props.bars, props.trades, props.title], render)
 </script>
 
 <template>

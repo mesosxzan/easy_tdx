@@ -6,7 +6,7 @@
 
 import { computed, ref } from 'vue'
 
-import { fetchBars, formatError } from '../api'
+import { fetchBars, fetchStockName, formatError } from '../api'
 import { detectMarket, marketLabel } from '../market'
 import { useBacktestStore } from '../stores/backtest'
 import type { Category } from '../types'
@@ -34,7 +34,8 @@ const endDate = defineModel<string>('endDate', {
 const error = ref('')
 // loading 由父组件控制（回测/寻优时驱动），组件自身只暴露 loadBars
 const loading = ref(false)
-const source = ref<'manual' | 'wencai'>('manual')
+// 数据来源（直接代码 / 问财结果）暴露为 model，父组件可据此调整布局
+const source = defineModel<'manual' | 'wencai'>('source', { default: 'manual' })
 
 const CATEGORIES: Category[] = ['DAY', 'WEEK', 'MONTH', 'MIN_5', 'MIN_15', 'MIN_30', 'MIN_60']
 
@@ -81,6 +82,14 @@ async function loadBars(): Promise<boolean> {
     const range = `${startDate.value} ~ ${endDate.value}`
     store.setOhlcv(bars, `${market}:${code.value} ${category.value} ${range}`)
     store.clearResult()
+    // 非阻塞获取股票名称（K线图标题用），失败时静默忽略
+    fetchStockName(market, code.value)
+      .then((name) => {
+        store.stockName = name
+      })
+      .catch(() => {
+        store.stockName = ''
+      })
     return true
   } catch (e) {
     error.value = formatError(e)
@@ -117,7 +126,11 @@ defineExpose({ loadBars, loading })
 
     <div v-else class="field">
       <label>问财选股</label>
-      <WencaiSourcePanel mode="single" :selected-codes="[code]" @pick="applyWencaiCode" />
+      <WencaiSourcePanel mode="single" :selected-codes="[code]" @pick="applyWencaiCode">
+        <template #actions>
+          <slot name="wencai-actions" />
+        </template>
+      </WencaiSourcePanel>
       <p v-if="/^\d{6}$/.test(code)" class="ok chosen-code">
         当前已选择：{{ code }}<span v-if="detectedMarket">（{{ detectedMarket }}）</span>
       </p>
