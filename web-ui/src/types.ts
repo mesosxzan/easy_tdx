@@ -97,6 +97,9 @@ export interface WencaiBacktestStockResult {
   market: string
   name: string
   performance: Partial<Performance>
+  equity_curve: EquityPoint[]
+  trades: Trade[]
+  bars: Bar[]
   error: string | null
 }
 

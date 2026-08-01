@@ -2,12 +2,17 @@
 // 问财批量回测页面：左配置（问财搜索 + 策略 + 资金 + 日期）/ 右结果（汇总 + 逐标的表格）。
 // 核心交互：在问财搜索栏旁放置「批量回测」按钮，点击后后端自动搜索 + 逐个独立回测 + 汇总。
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
+import EquityChart from '../components/EquityChart.vue'
+import KlineChart from '../components/KlineChart.vue'
+import MetricTable from '../components/MetricTable.vue'
 import StrategyPicker from '../components/StrategyPicker.vue'
+import TradeTable from '../components/TradeTable.vue'
 import WencaiSourcePanel from '../components/WencaiSourcePanel.vue'
+import { normalizeBar } from '../api'
 import { useBacktestStore } from '../stores/backtest'
-import type { Category, ExecutionMode } from '../types'
+import type { Bar, Category, ExecutionMode, Performance, WencaiBacktestStockResult } from '../types'
 
 const store = useBacktestStore()
 
@@ -40,6 +45,11 @@ onMounted(async () => {
   await store.loadStrategies().catch((e) => {
     store.error = `加载策略列表失败：${e instanceof Error ? e.message : e}`
   })
+  window.addEventListener('keydown', onKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeyDown)
 })
 
 const strategyLabel = computed(
@@ -92,6 +102,90 @@ const sortedResults = computed(() => {
     return rb - ra
   })
 })
+
+// ── 选中标的与键盘导航（↑↓ 切换）──────────────────────────────────────────
+const selectedIndex = ref(0)
+
+/** 当前选中的标的（已排序结果中的第 selectedIndex 项）。 */
+const selectedResult = computed<WencaiBacktestStockResult | null>(() => {
+  const rows = sortedResults.value
+  if (rows.length === 0) return null
+  return rows[Math.min(selectedIndex.value, rows.length - 1)]
+})
+
+/** 选中标的的 OHLCV bars（后端返回原始 dict，需 normalizeBar 转为 Bar[]）。 */
+const selectedBars = computed<Bar[]>(() => {
+  const raw = selectedResult.value?.bars
+  if (!raw || raw.length === 0) return []
+  return raw.map((r) => normalizeBar(r as unknown as Record<string, unknown>))
+})
+
+/** 选中标的的绩效指标（补齐默认值，满足 MetricTable 的 Performance 类型约束）。 */
+const selectedPerf = computed<Performance>(() => ({
+  total_return: 0,
+  annual_return: 0,
+  max_drawdown: 0,
+  max_dd_duration: 0,
+  sharpe: 0,
+  sortino: 0,
+  calmar: 0,
+  total_trades: 0,
+  win_trades: 0,
+  lose_trades: 0,
+  rejected_trades: 0,
+  win_rate: 0,
+  profit_factor: 0,
+  avg_win: 0,
+  avg_loss: 0,
+  max_win: 0,
+  max_loss: 0,
+  avg_holding_days: 0,
+  volatility: 0,
+  buy_hold_return: 0,
+  ...selectedResult.value?.performance,
+}))
+
+/** 上下键切换标的。输入框/文本域/下拉框聚焦时不拦截方向键。 */
+function onKeyDown(e: KeyboardEvent) {
+  if (!store.wencaiResult || sortedResults.value.length === 0) return
+  const t = e.target as HTMLElement
+  if (
+    t instanceof HTMLInputElement ||
+    t instanceof HTMLTextAreaElement ||
+    t instanceof HTMLSelectElement
+  ) {
+    return
+  }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    if (selectedIndex.value < sortedResults.value.length - 1) {
+      selectedIndex.value++
+      scrollSelectedIntoView()
+    }
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    if (selectedIndex.value > 0) {
+      selectedIndex.value--
+      scrollSelectedIntoView()
+    }
+  }
+}
+
+function scrollSelectedIntoView() {
+  nextTick(() => {
+    document
+      .querySelector('.result-table tbody tr.selected')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+}
+
+// 新回测结果到达时重置选中索引到第一只
+watch(
+  () => store.wencaiResult,
+  () => {
+    selectedIndex.value = 0
+  },
+)
 </script>
 
 <template>
@@ -257,9 +351,46 @@ const sortedResults = computed(() => {
           </div>
         </section>
 
+        <!-- 选中标的详情（↑↓ 键切换）-->
+        <section v-if="selectedResult" class="report-section detail-section">
+          <h3 class="detail-title">
+            <span>{{ selectedResult.market }}:{{ selectedResult.symbol }}</span>
+            <span class="detail-name">{{ selectedResult.name }}</span>
+            <span class="kb-hint">↑↓ 切换标的</span>
+          </h3>
+          <div v-if="selectedResult.error" class="err-detail">
+            回测失败：{{ selectedResult.error }}
+          </div>
+          <template v-else>
+            <div class="detail-sub">
+              <h4>K线 · 均线 · 成交量 · 买卖点</h4>
+              <KlineChart
+                :bars="selectedBars"
+                :trades="selectedResult.trades"
+                :title="`${selectedResult.market}:${selectedResult.symbol} ${selectedResult.name}`"
+              />
+            </div>
+            <div class="detail-sub">
+              <h4>净值曲线与回撤</h4>
+              <EquityChart :equity="selectedResult.equity_curve" />
+            </div>
+            <div class="detail-sub">
+              <h4>绩效指标</h4>
+              <MetricTable :perf="selectedPerf" />
+            </div>
+            <div class="detail-sub">
+              <h4>成交记录（{{ selectedResult.trades.length }} 笔）</h4>
+              <TradeTable :trades="selectedResult.trades" />
+            </div>
+          </template>
+        </section>
+
         <!-- 逐标的回测结果 -->
         <section class="report-section">
-          <h3>各标的回测结果（{{ sortedResults.length }} 只，按收益降序）</h3>
+          <h3>
+            各标的回测结果（{{ sortedResults.length }} 只，按收益降序）
+            <span class="kb-hint">↑↓ 切换 · 点击行选中</span>
+          </h3>
           <div class="table-wrap">
             <table class="result-table">
               <thead>
@@ -276,7 +407,12 @@ const sortedResults = computed(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in sortedResults" :key="row.symbol">
+                <tr
+                  v-for="(row, i) in sortedResults"
+                  :key="row.symbol"
+                  :class="{ selected: i === selectedIndex }"
+                  @click="selectedIndex = i"
+                >
                   <td class="code">{{ row.symbol }}</td>
                   <td class="name">{{ row.name }}</td>
                   <td
@@ -493,5 +629,63 @@ const sortedResults = computed(() => {
   margin-top: 8px;
   color: var(--text-dim);
   font-size: 11px;
+}
+
+/* 表格行：可点击 + 选中高亮 */
+.result-table tbody tr {
+  cursor: pointer;
+}
+.result-table tbody tr.selected {
+  background: rgba(245, 158, 11, 0.08);
+}
+.result-table tbody tr.selected td.code {
+  color: var(--accent);
+}
+
+/* 键盘操作提示 */
+.kb-hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-dim);
+  margin-left: 8px;
+}
+
+/* 选中标的详情面板 */
+.detail-section {
+  border-color: rgba(245, 158, 11, 0.25);
+}
+.detail-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-title > span:first-child {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--accent);
+}
+.detail-name {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+.detail-sub {
+  margin-bottom: 16px;
+}
+.detail-sub:last-child {
+  margin-bottom: 0;
+}
+.detail-sub h4 {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.err-detail {
+  padding: 12px 14px;
+  background: rgba(239, 65, 70, 0.08);
+  border: 1px solid var(--up);
+  border-radius: var(--radius);
+  color: var(--up);
+  font-size: 13px;
 }
 </style>

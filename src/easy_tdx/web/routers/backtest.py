@@ -34,6 +34,7 @@ from easy_tdx.web.backtest_schemas import (
     serialize_result,
 )
 from easy_tdx.web.deps import get_client
+from easy_tdx.web.schemas import DataFrameResponse
 from easy_tdx.web.task_runner import get_runner
 
 router = APIRouter(tags=["backtest"])
@@ -442,12 +443,16 @@ def _run_wencai_backtest(
             )
             result = engine.run(df)
             serialized = serialize_result(result)
+            bars = DataFrameResponse.from_dataframe(df).data
             results.append(
                 {
                     "symbol": symbol,
                     "market": market,
                     "name": name,
                     "performance": serialized.get("performance", {}),
+                    "equity_curve": serialized.get("equity_curve", []),
+                    "trades": serialized.get("trades", []),
+                    "bars": bars,
                     "error": None,
                 }
             )
@@ -458,6 +463,9 @@ def _run_wencai_backtest(
                     "market": market,
                     "name": name,
                     "performance": {},
+                    "equity_curve": [],
+                    "trades": [],
+                    "bars": [],
                     "error": str(e),
                 }
             )

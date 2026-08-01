@@ -141,7 +141,7 @@ export async function fetchWencaiSearch(
 }
 
 /** 把后端 bars 的单条记录归一化为统一 Bar（datetime 字段）。 */
-function normalizeBar(row: Record<string, unknown>): Bar {
+export function normalizeBar(row: Record<string, unknown>): Bar {
   const raw = (row.datetime ?? row.date) as string | undefined
   if (!raw) throw new Error('行情数据缺少 datetime/date 字段')
   return {
