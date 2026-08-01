@@ -86,12 +86,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if enable_mac:
         try:
             from easy_tdx.mac.client import AsyncMacClient
+            from easy_tdx.config import get_best_mac_host
 
-            mac_client = AsyncMacClient.from_best_host()
-            await mac_client.connect()
-            logger.info("MAC client connected")
+            mac_host = get_best_mac_host()
+            mac_client = AsyncMacClient(
+                host=mac_host,
+                port=port,
+                timeout=timeout,
+            )
+            try:
+                await mac_client.connect()
+                logger.info("MAC client connected to %s:%s", mac_host, port)
+            except Exception:
+                logger.warning("MAC client connection failed — MAC endpoints will return 503")
         except Exception:
-            logger.warning("MAC client connection failed — MAC endpoints will return 503")
+            logger.warning("MAC client init failed — MAC endpoints will return 503")
             mac_client = None
     app.state.mac_client = mac_client
 

@@ -36,16 +36,39 @@ async def security_bars(
     bar_time: str = Query(
         "start", description="时间戳: start=bar开始时间(默认) / end=bar结束时间(对齐Tushare)"
     ),
-    client: Any = Depends(get_mac_client),
+    source: str = Query(
+        "auto",
+        description="数据源: auto=优先MAC失败则TDX / mac=仅MAC / tdx=仅TDX",
+        pattern=r"^(auto|mac|tdx)$",
+    ),
+    mac_client: Any = Depends(get_mac_client),
+    tdx_client: Any = Depends(get_client),
 ) -> DataFrameResponse:
     """获取股票K线数据（前复权，通过 MacClient）。"""
-    df = await client.get_stock_kline(
-        market_value_from_str(market),
+    from easy_tdx.exceptions import TdxConnectionError
+
+    if source in ("auto", "mac"):
+        try:
+            df = await mac_client.get_stock_kline(
+                market_value_from_str(market),
+                code,
+                period_from_str(category),
+                start=start,
+                count=count,
+                adjust=Adjust.QFQ,
+                bar_time=bar_time,
+            )
+            return _df_resp(df)
+        except TdxConnectionError:
+            if source == "mac":
+                raise
+
+    df = await tdx_client.get_security_bars(
+        market_from_str(market),
         code,
-        period_from_str(category),
-        start=start,
-        count=count,
-        adjust=Adjust.QFQ,
+        category_from_str(category),
+        start,
+        count,
         bar_time=bar_time,
     )
     return _df_resp(df)
