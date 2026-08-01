@@ -392,10 +392,10 @@ class TestStrategyBase:
                 pass
 
             def next(self) -> None:
-                # 验证 datetime 正确（YYYYMMDD 格式）
+                # 验证 datetime 正确（YYYYMMDDHHMMSS 格式，日线时间部分为 000000）
                 dt = self._get_datetime()
                 assert isinstance(dt, int)
-                assert 20240101 <= dt <= 20241231
+                assert 20240101000000 <= dt <= 20241231000000
 
         strategy = DateTimeStrategy()
         strategy._bind_data(df)

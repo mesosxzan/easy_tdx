@@ -22,6 +22,12 @@ import click
     default=None,
     help="低级别周期（多级别联立），如 30MIN；分析高级别最后一笔在低级别中的走势",
 )
+@click.option(
+    "--incremental/--batch",
+    "use_incremental",
+    default=True,
+    help="是否使用增量缠论分析（无前瞻偏差）",
+)
 @click.option("--table", "use_table", is_flag=True, help="表格输出")
 @click.option("--output", "output_fmt", type=click.Choice(["json", "table", "csv"]), default="json")
 def chanlun(
@@ -31,6 +37,7 @@ def chanlun(
     count: int,
     adjust: str,
     low_level_period: str | None,
+    use_incremental: bool,
     use_table: bool,
     output_fmt: str,
 ) -> None:
@@ -49,6 +56,7 @@ def chanlun(
       easy-tdx chanlun SZ 000001 --multi-level 5MIN
     """
     from ..chanlun.analyser import ChanlunAnalyser
+    from ..chanlun.incremental import IncrementalAnalyser
     from .conn import get_mac_client
     from .parsers import parse_adjust, parse_market, parse_period
 
@@ -63,7 +71,8 @@ def chanlun(
             adjust=parse_adjust(adjust),
         )
 
-        analyser = ChanlunAnalyser(code=code, frequency=period)
+        analyser_cls = IncrementalAnalyser if use_incremental else ChanlunAnalyser
+        analyser = analyser_cls(code=code, frequency=period)
         result = analyser.process_klines(df)
 
         result_dict = result.to_dict()
@@ -72,7 +81,16 @@ def chanlun(
         multi_level_info: dict[str, Any] | None = None
         if low_level_period is not None:
             multi_level_info = _run_multi_level(
-                client, mkt, code, period, low_level_period, count, adjust, analyser, result
+                client,
+                mkt,
+                code,
+                period,
+                low_level_period,
+                count,
+                adjust,
+                analyser,
+                result,
+                use_incremental,
             )
             if multi_level_info is not None:
                 result_dict["multi_level"] = multi_level_info
@@ -181,6 +199,7 @@ def _run_multi_level(
     adjust: str,
     high_analyser: Any,
     high_result: Any,
+    use_incremental: bool,
 ) -> dict[str, Any] | None:
     """运行多级别联立分析。
 
@@ -201,6 +220,7 @@ def _run_multi_level(
         多级别分析信息字典，或 None（数据不足时）
     """
     from ..chanlun.analyser import ChanlunAnalyser
+    from ..chanlun.incremental import IncrementalAnalyser
     from ..chanlun.multi_level import MultiLevelAnalyser
     from .parsers import parse_adjust, parse_period
 
@@ -220,7 +240,8 @@ def _run_multi_level(
         adjust=parse_adjust(adjust),
     )
 
-    low_analyser = ChanlunAnalyser(code=code, frequency=low_period)
+    analyser_cls = IncrementalAnalyser if use_incremental else ChanlunAnalyser
+    low_analyser = analyser_cls(code=code, frequency=low_period)
 
     mla = MultiLevelAnalyser()
     mla.add_level("high", high_analyser)

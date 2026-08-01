@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from easy_tdx.chanlun.config import ChanlunConfig
 from easy_tdx.chanlun.types import BI, ZS
 
@@ -45,23 +47,36 @@ def find_zss(
 
     zss: list[ZS] = []
     current_zs: ZS | None = None
+    pending: list[BI] = []
+
+    def _try_start_zs(lines: list[BI]) -> ZS | None:
+        if len(lines) < config.zs_min_lines:
+            return None
+        overlap_high = min(l.high for l in lines)
+        overlap_low = max(l.low for l in lines)
+        if overlap_high <= overlap_low:
+            return None
+        return ZS(
+            lines=list(lines),
+            zg=overlap_high,
+            zd=overlap_low,
+            gg=max(l.high for l in lines),
+            dd=min(l.low for l in lines),
+            start=lines[0].start,
+            end=lines[-1].end,
+            index=len(zss),
+        )
 
     for bi in bis:
         if current_zs is None:
-            # 尝试开始新中枢：需要至少前两笔有重叠
-            # 中枢至少需要3笔，先累积
-            if len(zss) == 0 or True:
-                # 用当前笔初始化中枢候选
-                current_zs = ZS(
-                    lines=[bi],
-                    zg=bi.high,
-                    zd=bi.low,
-                    gg=bi.high,
-                    dd=bi.low,
-                    start=bi.start,
-                    end=bi.end,
-                    index=len(zss),
-                )
+            pending.append(bi)
+            while len(pending) >= config.zs_min_lines:
+                candidate = _try_start_zs(pending[: config.zs_min_lines])
+                if candidate is not None:
+                    current_zs = candidate
+                    pending.clear()
+                    break
+                pending.pop(0)
             continue
 
         # 当前笔与中枢是否有重叠
@@ -82,18 +97,20 @@ def find_zss(
                 # 中枢成立
                 current_zs.done = True
                 zss.append(current_zs)
-            current_zs = None
-            # 当前笔作为新中枢的起始
-            current_zs = ZS(
-                lines=[bi],
-                zg=bi.high,
-                zd=bi.low,
-                gg=bi.high,
-                dd=bi.low,
-                start=bi.start,
-                end=bi.end,
-                index=len(zss),
+            carry = (
+                cast(list[BI], current_zs.lines[-(config.zs_min_lines - 1) :])
+                if config.zs_min_lines > 1
+                else []
             )
+            current_zs = None
+            pending = list(carry) + [bi]
+            while len(pending) >= config.zs_min_lines:
+                candidate = _try_start_zs(pending[: config.zs_min_lines])
+                if candidate is not None:
+                    current_zs = candidate
+                    pending.clear()
+                    break
+                pending.pop(0)
 
     # 处理最后一个中枢
     if current_zs is not None and current_zs.line_count >= config.zs_min_lines:

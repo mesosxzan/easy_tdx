@@ -726,3 +726,137 @@ class TestEngineExecutionModel:
         engine = BacktestEngine(SimpleBuy, cash=100000)
         result = engine.run(df)
         assert result.positions["size"].max() > 0
+
+
+# ── 分钟级回测（MIN_30 / MIN_60）─────────────────────────────────────────────
+
+
+def _make_minute_df(n: int = 100, freq: str = "30min", seed: int = 42) -> pd.DataFrame:
+    """生成分钟级 OHLCV 数据（模拟 MIN_30 / MIN_60）。"""
+    rng = np.random.default_rng(seed)
+    close = 100.0 + np.cumsum(rng.normal(0, 0.5, n))
+    high = close + rng.uniform(0, 0.5, n)
+    low = close - rng.uniform(0, 0.5, n)
+    open_ = low + rng.uniform(0, high - low, n)
+    volume = rng.integers(100000, 1000000, n)
+
+    dates = pd.date_range("2024-01-02 09:30", periods=n, freq=freq)
+    return pd.DataFrame(
+        {
+            "datetime": dates,
+            "open": open_,
+            "high": high,
+            "low": low,
+            "close": close,
+            "vol": volume,
+        }
+    )
+
+
+class MinuteBuySellStrategy(Strategy):
+    """在指定 bar 买入、后卖出的简单策略（用于分钟级验证）。"""
+
+    def init(self) -> None:
+        pass
+
+    def next(self) -> None:
+        if self._bar_index == 5 and self.position["size"] == 0:
+            self.buy(size=0)
+        if self._bar_index == 50 and self.position["size"] > 0:
+            self.sell(size=0)
+
+
+def test_minute_30_backtest_produces_trades():
+    """MIN_30 分钟级数据回测应正确产生买卖交易。
+
+    回归 datetime 格式 bug：_datetime_to_int 曾用 %Y%m%d（截断时分秒），
+    导致同一天多根分钟 bar 的 int 值相同，trade_map 查找失败、交易被静默跳过。
+    """
+    df = _make_minute_df(n=100, freq="30min")
+    engine = BacktestEngine(MinuteBuySellStrategy, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    assert len(trades) >= 2, f"Expected >=2 trades for 30-min data, got {len(trades)}"
+
+    buy_trades = trades[trades["direction"] == "BUY"]
+    sell_trades = trades[trades["direction"] == "SELL"]
+    assert len(buy_trades) >= 1
+    assert len(sell_trades) >= 1
+
+
+def test_minute_30_trade_datetime_preserves_minutes():
+    """分钟级交易的 datetime 应保留时分秒，不能被截断为纯日期。
+
+    验证 trade_map key 的唯一性：不同分钟 bar 产生不同的 int datetime。
+    """
+    df = _make_minute_df(n=100, freq="30min")
+    engine = BacktestEngine(MinuteBuySellStrategy, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    assert len(trades) >= 2
+
+    # 交易 datetime 应包含时分（非 00:00:00）
+    buy_trade = trades[trades["direction"] == "BUY"].iloc[0]
+    trade_dt = pd.Timestamp(buy_trade["datetime"])
+    assert trade_dt.hour != 0 or trade_dt.minute != 0, (
+        f"Trade datetime {trade_dt} appears truncated (00:00:00) -- "
+        "minute-level info lost"
+    )
+
+
+def test_minute_60_backtest_produces_trades():
+    """MIN_60 分钟级数据回测应正确产生买卖交易。"""
+    df = _make_minute_df(n=100, freq="60min")
+    engine = BacktestEngine(MinuteBuySellStrategy, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    assert len(trades) >= 2, f"Expected >=2 trades for 60-min data, got {len(trades)}"
+
+
+def test_minute_30_stop_loss_works():
+    """分钟级数据下止损应正确触发（datetime 不再被截断导致查找失败）。"""
+    df = _make_flat_df(n=30, base_price=100.0)
+    # 改成 30 分钟频率
+    df["datetime"] = pd.date_range("2024-01-02 09:30", periods=30, freq="30min")
+
+    # Bar 12 低于止损价
+    df.loc[12, "low"] = 93.0
+    df.loc[12, "close"] = 94.0
+
+    engine = BacktestEngine(StopLossStrategy, cash=100000)
+    result = engine.run(df)
+
+    trades = result.trades[~result.trades["rejected"]]
+    sell_trades = trades[trades["direction"] == "SELL"]
+    assert len(sell_trades) >= 1, "Expected stop-loss sell on minute-level data"
+    assert sell_trades.iloc[0]["price"] == 95.0
+
+
+def test_minute_30_execution_model_affects_equity():
+    """分钟级数据 + ExecutionModel（TWAP）路径的交易必须影响权益曲线。
+
+    回归 datetime 类型分歧 bug 的分钟级变体：同一天多根分钟 bar 的 int datetime
+    若被截断为 %Y%m%d 则全部相同，trade_map 查找全部命中同一 bar 或全部 miss。
+    """
+    df = _make_minute_df(n=50, freq="30min")
+
+    class BuyAndHold(Strategy):
+        def init(self) -> None:
+            pass
+
+        def next(self) -> None:
+            if self._bar_index == 0:
+                self.buy(size=0)
+
+    engine = BacktestEngine(
+        BuyAndHold,
+        cash=100000,
+        execution_model=TWAPExecution(n_bars=3),
+    )
+    result = engine.run(df)
+
+    assert result.positions["size"].max() > 0
+    assert result.equity_curve["total"].nunique() > 1

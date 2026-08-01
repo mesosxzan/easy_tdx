@@ -48,7 +48,13 @@ async def chanlun_analyze(
         "YEAR": "yearly",
     }
     freq = frequency_map.get(req.category.upper(), req.category)
-    analyser = ChanlunAnalyser(code=symbol, frequency=freq)
-    result = analyser.process_klines(df)
+    if req.incremental:
+        from easy_tdx.chanlun.incremental import IncrementalAnalyser
+
+        analyser = IncrementalAnalyser(code=symbol, frequency=freq)
+        result = analyser.process_klines(df)
+    else:
+        analyser = ChanlunAnalyser(code=symbol, frequency=freq)
+        result = analyser.process_klines(df)
 
     return result.to_dict()

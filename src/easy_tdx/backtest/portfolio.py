@@ -8,7 +8,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from easy_tdx.backtest.types import Trade
+from easy_tdx.backtest.types import DATETIME_FMT, Trade
 
 
 class PortfolioTracker:
@@ -51,7 +51,7 @@ class PortfolioTracker:
     def _build_datetime_index(dt_col: pd.Series) -> dict[object, int]:
         """构建 datetime 值 → 位置索引 的映射。
 
-        对 datetime 列做归一化（datetime64 → int YYYYMMDD，与 OrderSimulator
+        对 datetime 列做归一化（datetime64 → int YYYYMMDDHHMMSS，与 OrderSimulator
         的 _find_bar_index 同款逻辑），保证无论上游 datetime 是哪种类型，
         查询键都能命中同一张表。
 
@@ -62,7 +62,7 @@ class PortfolioTracker:
             {归一化后的 datetime 值: 位置索引}，重复值取首次出现位置。
         """
         if pd.api.types.is_datetime64_any_dtype(dt_col):
-            keys = dt_col.dt.strftime("%Y%m%d").astype("int64").to_numpy()
+            keys = dt_col.dt.strftime(DATETIME_FMT).astype("int64").to_numpy()
         else:
             keys = dt_col.to_numpy()
         mapping: dict[object, int] = {}
@@ -77,15 +77,15 @@ class PortfolioTracker:
         与 _build_datetime_index 使用同一套归一化规则，保证类型无关命中。
 
         Args:
-            trade_dt: 交易时间（int YYYYMMDD / Timestamp / datetime64）
+            trade_dt: 交易时间（int YYYYMMDDHHMMSS / Timestamp / datetime64）
 
         Returns:
             df 中的位置索引，未命中返回 None
         """
-        # datetime-like（Timestamp / datetime64）→ int YYYYMMDD 再查
+        # datetime-like（Timestamp / datetime64）→ int YYYYMMDDHHMMSS 再查
         if hasattr(trade_dt, "strftime"):
             try:
-                key: object = int(trade_dt.strftime("%Y%m%d"))
+                key: object = int(trade_dt.strftime(DATETIME_FMT))
             except (ValueError, AttributeError):
                 return None
         else:

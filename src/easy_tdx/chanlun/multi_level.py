@@ -6,10 +6,19 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol
 
-from easy_tdx.chanlun.analyser import ChanlunAnalyser, ChanlunResult
+import pandas as pd
+
+from easy_tdx.chanlun.analyser import ChanlunResult
 from easy_tdx.chanlun.types import BI
+
+
+class ChanlunAnalyserLike(Protocol):
+    def process_klines(self, df: pd.DataFrame) -> ChanlunResult: ...
+
+    @property
+    def result(self) -> ChanlunResult: ...
 
 
 class MultiLevelAnalyser:
@@ -31,9 +40,9 @@ class MultiLevelAnalyser:
     """
 
     def __init__(self) -> None:
-        self._analysers: dict[str, ChanlunAnalyser] = {}
+        self._analysers: dict[str, ChanlunAnalyserLike] = {}
 
-    def add_level(self, name: str, analyser: ChanlunAnalyser) -> None:
+    def add_level(self, name: str, analyser: ChanlunAnalyserLike) -> None:
         """添加一个分析级别。
 
         Args:

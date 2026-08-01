@@ -543,9 +543,22 @@ def _print_portfolio_table(result: Any) -> None:
     type=click.Choice(["full", "fixed", "percent"], case_sensitive=False),
     help="仓位模式：full=全仓 / fixed=指定股数 / percent=百分比（默认 full）",
 )
+@click.option(
+    "--warmup-bars",
+    "warmup_bars",
+    default=0,
+    type=int,
+    help="指标预热 bar 数，前 N 根不产生信号（默认 0）",
+)
 @click.option("--period", default="DAILY", help="K线周期")
 @click.option("--adjust", default="NONE", help="复权: NONE/QFQ/HFQ")
 @click.option("--count", default=250, type=int, help="K线数量")
+@click.option(
+    "--chanlun-level",
+    "chanlun_level",
+    default=None,
+    help="自动计算缠论分析并注入策略（如 DAILY/30MIN）。仅缠论策略需要，默认不启用。",
+)
 @click.option("--cookie", default=None, help="问财 Cookie（不传时自动读取配置）")
 @click.option("--table", "use_table", is_flag=True, default=True, help="表格输出（默认）")
 @click.option("--json", "use_json", is_flag=True, default=False, help="JSON 输出")
@@ -558,9 +571,11 @@ def backtest_wencai(
     commission: float,
     execution: str,
     position_mode: str,
+    warmup_bars: int,
     period: str,
     adjust: str,
     count: int,
+    chanlun_level: str | None,
     cookie: str | None,
     use_table: bool,
     use_json: bool,
@@ -642,6 +657,8 @@ def backtest_wencai(
                     commission=commission,
                     execution=execution,
                     position_mode=position_mode,
+                    chanlun_level=chanlun_level,
+                    warmup_bars=warmup_bars,
                 )
                 result = engine.run(df)
                 results.append(

@@ -11,6 +11,10 @@ from typing import Any, Literal
 
 import pandas as pd
 
+# datetime → int 编码格式：保留时分秒以支持分钟级（MIN_5/MIN_15/MIN_30/MIN_60）
+# 回测。日线数据的时间部分为 "000000"（午夜），与旧的 YYYYMMDD 格式向后兼容。
+DATETIME_FMT = "%Y%m%d%H%M%S"
+
 # ── 交易信号 ────────────────────────────────────────────────────────────────
 
 
@@ -19,7 +23,8 @@ class Signal:
     """策略产生的交易信号。
 
     Attributes:
-        datetime: 信号时间（YYYYMMDD 整数格式，如 20240101）
+        datetime: 信号时间（整数格式。日线=YYYYMMDD 如 20240101；
+            分钟级=YYYYMMDDHHMMSS 如 20240101093000）
         direction: 交易方向
         size: 交易数量（0 = 全仓/清仓）
         price: 限价（None = 市价单）
@@ -48,7 +53,8 @@ class Trade:
     """已成交记录。
 
     Attributes:
-        datetime: 成交时间（YYYYMMDD 整数格式，如 20240101）
+        datetime: 成交时间（整数格式。日线=YYYYMMDD 如 20240101；
+            分钟级=YYYYMMDDHHMMSS 如 20240101093000）
         direction: 交易方向
         size: 成交数量
         price: 成交价格
@@ -81,7 +87,8 @@ class Position:
     """持仓快照。
 
     Attributes:
-        datetime: 快照时间（YYYYMMDD 整数格式，如 20240101）
+        datetime: 快照时间（整数格式。日线=YYYYMMDD 如 20240101；
+            分钟级=YYYYMMDDHHMMSS 如 20240101093000）
         size: 持仓数量（正=多头，负=空头，0=空仓）
         avg_price: 平均持仓成本
         market_value: 市值

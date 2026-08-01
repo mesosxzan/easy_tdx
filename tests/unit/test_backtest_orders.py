@@ -7,7 +7,7 @@ import pytest
 
 from easy_tdx.backtest.orders import OrderSimulator
 from easy_tdx.backtest.slippage import FixedSlippage, PercentSlippage
-from easy_tdx.backtest.types import Signal
+from easy_tdx.backtest.types import DATETIME_FMT, Signal
 
 # ── Test Fixtures ─────────────────────────────────────────────────────────────
 
@@ -290,8 +290,13 @@ class TestEdgeCases:
 
         sim = OrderSimulator(df, execution="next_open")
 
-        signals = [_buy_signal(0, size=100)]
-        trades = sim.simulate(signals, cash=20000, position=0)
+        # datetime64 列经 DATETIME_FMT 编码后为 YYYYMMDDHHMMSS（午夜=000000）
+        signal = Signal(
+            datetime=int(df["datetime"].iloc[0].strftime(DATETIME_FMT)),
+            direction="BUY",
+            size=100,
+        )
+        trades = sim.simulate([signal], cash=20000, position=0)
 
         assert len(trades) == 1
 

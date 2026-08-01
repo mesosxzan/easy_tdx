@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 
 from easy_tdx.backtest.portfolio import PortfolioTracker
-from easy_tdx.backtest.types import Trade
+from easy_tdx.backtest.types import DATETIME_FMT, Trade
 
 
 def _make_df(n: int = 10) -> pd.DataFrame:
@@ -305,9 +305,9 @@ def test_apply_trades_int_datetime_vs_datetime64_df() -> None:
             "close": [10, 11, 12, 11, 10, 13, 14, 13, 15, 16],
         }
     )
-    # trade.datetime 为 int YYYYMMDD（类型与 df 不一致）
+    # trade.datetime 为 int YYYYMMDDHHMMSS（与 df datetime64 归一化后一致）
     buy = Trade(
-        datetime=20240101,
+        datetime=20240101000000,
         direction="BUY",
         size=100,
         price=10.0,
@@ -315,7 +315,7 @@ def test_apply_trades_int_datetime_vs_datetime64_df() -> None:
         slippage=0.0,
     )
     sell = Trade(
-        datetime=20240106,
+        datetime=20240106000000,
         direction="SELL",
         size=100,
         price=13.0,
@@ -339,7 +339,7 @@ def test_apply_trades_timestamp_vs_int_df() -> None:
     df = pd.DataFrame(
         {
             "datetime": [
-                int(d.strftime("%Y%m%d")) for d in pd.date_range("2024-01-01", periods=10, freq="D")
+                int(d.strftime(DATETIME_FMT)) for d in pd.date_range("2024-01-01", periods=10, freq="D")
             ],
             "close": [10, 11, 12, 11, 10, 13, 14, 13, 15, 16],
         }

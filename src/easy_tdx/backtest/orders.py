@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
-from easy_tdx.backtest.types import Signal, Trade
+from easy_tdx.backtest.types import DATETIME_FMT, Signal, Trade
 
 if TYPE_CHECKING:
     from easy_tdx.backtest.slippage import SlippageModel
@@ -163,7 +163,7 @@ class OrderSimulator:
         """查找 datetime 对应的 K 线索引。
 
         Args:
-            datetime_val: 信号时间（int 格式 YYYYMMDD）
+            datetime_val: 信号时间（int 格式 YYYYMMDDHHMMSS 或 YYYYMMDD）
 
         Returns:
             K 线索引，未找到返回 None
@@ -182,9 +182,9 @@ class OrderSimulator:
         except (TypeError, ValueError):
             pass
 
-        # 如果是 datetime 对象，转为 int 比较
+        # 如果是 datetime 对象，转为 int 比较（保留时分秒以支持分钟级回测）
         if pd.api.types.is_datetime64_any_dtype(dt_col):
-            dt_ints = dt_col.dt.strftime("%Y%m%d").astype(int)
+            dt_ints = dt_col.dt.strftime(DATETIME_FMT).astype(int)
             mask_arr = (dt_ints == datetime_val).to_numpy()
             if mask_arr.any():
                 return int(mask_arr.argmax())

@@ -15,7 +15,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 
-from easy_tdx.backtest.types import Signal
+from easy_tdx.backtest.types import DATETIME_FMT, Signal
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -446,7 +446,10 @@ class Strategy(ABC):
 
 
 def _datetime_to_int(arr: NDArray) -> NDArray:
-    """将 datetime 数组转为 int (YYYYMMDD)。
+    """将 datetime 数组转为 int (YYYYMMDDHHMMSS)。
+
+    保留时分秒以支持分钟级回测（MIN_5/MIN_15/MIN_30/MIN_60）。
+    日线数据的时间部分为 "000000"（午夜），与旧的 YYYYMMDD 格式兼容。
 
     向量化实现，自动处理 datetime64、object（Timestamp）和数值类型。
 
@@ -454,19 +457,21 @@ def _datetime_to_int(arr: NDArray) -> NDArray:
         arr: datetime 数组（np.datetime64、pd.Timestamp 或数值）
 
     Returns:
-        float64 数组，格式 YYYYMMDD
+        float64 数组，格式 YYYYMMDDHHMMSS（或原始数值，若输入已是数值）
     """
     if len(arr) == 0:
         return np.array([], dtype=np.float64)
     arr = np.asarray(arr)
     # datetime64 → 向量化转换
     if arr.dtype.kind == "M":
-        return np.asarray(pd.to_datetime(arr).strftime("%Y%m%d").astype(float), dtype=np.float64)
+        return np.asarray(
+            pd.to_datetime(arr).strftime(DATETIME_FMT).astype(float), dtype=np.float64
+        )
     # object 数组（可能包含 Timestamp）
     if arr.dtype == object:
         if len(arr) > 0 and isinstance(arr[0], pd.Timestamp | np.datetime64):
             return np.asarray(
-                pd.to_datetime(arr).strftime("%Y%m%d").astype(float), dtype=np.float64
+                pd.to_datetime(arr).strftime(DATETIME_FMT).astype(float), dtype=np.float64
             )
     # 已经是数值类型
     return arr.astype(np.float64)

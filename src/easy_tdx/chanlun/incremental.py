@@ -25,7 +25,7 @@ MMD信号。策略检测到此字段非空时使用增量信号，否则回退�
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 
@@ -91,6 +91,7 @@ class IncrementalAnalyser:
         # zs.index -> 确认时的K线index（离开笔的确认bar）
         self._zs_confirm_bar: dict[int, int] = {}
         self._current_zs: ZS | None = None  # 当前正在构建的中枢
+        self._zs_pending: list[BI] = []
 
         # ── 买卖点 ────────────────────────────────────────────────────────
         self._mmds: list[MMD] = []
@@ -219,6 +220,8 @@ class IncrementalAnalyser:
         向上合并取高高，向下合并取低低。方向由tentative CLKline与
         前一根confirmed CLKline的high比较决定。
         """
+        if self._tentative_ckline is None:
+            return "up"
         if len(self._confirmed_cklines) >= 1:
             prev = self._confirmed_cklines[-1]
             return "up" if self._tentative_ckline.high > prev.high else "down"
@@ -364,7 +367,16 @@ class IncrementalAnalyser:
             新关闭的中枢（如果有），否则None
         """
         if self._current_zs is None:
-            self._current_zs = self._init_zs(new_bi)
+            self._zs_pending.append(new_bi)
+            while len(self._zs_pending) >= self._config.zs_min_lines:
+                candidate = self._try_start_zs(
+                    self._zs_pending[: self._config.zs_min_lines]
+                )
+                if candidate is not None:
+                    self._current_zs = candidate
+                    self._zs_pending.clear()
+                    break
+                self._zs_pending.pop(0)
             return None
 
         overlap_high = min(self._current_zs.zg, new_bi.high)
@@ -388,20 +400,39 @@ class IncrementalAnalyser:
             self._zs_confirm_bar[self._current_zs.index] = confirm_bar
             closed_zs = self._current_zs
 
-        # 新笔初始化新中枢
-        self._current_zs = self._init_zs(new_bi)
+        carry = (
+            cast(list[BI], self._current_zs.lines[-(self._config.zs_min_lines - 1) :])
+            if self._config.zs_min_lines > 1
+            else []
+        )
+        self._current_zs = None
+        self._zs_pending = list(carry) + [new_bi]
+        while len(self._zs_pending) >= self._config.zs_min_lines:
+            candidate = self._try_start_zs(
+                self._zs_pending[: self._config.zs_min_lines]
+            )
+            if candidate is not None:
+                self._current_zs = candidate
+                self._zs_pending.clear()
+                break
+            self._zs_pending.pop(0)
         return closed_zs
 
-    def _init_zs(self, bi: BI) -> ZS:
-        """用单笔初始化一个新中枢。"""
+    def _try_start_zs(self, lines: list[BI]) -> ZS | None:
+        if len(lines) < self._config.zs_min_lines:
+            return None
+        overlap_high = min(l.high for l in lines)
+        overlap_low = max(l.low for l in lines)
+        if overlap_high <= overlap_low:
+            return None
         return ZS(
-            lines=[bi],
-            zg=bi.high,
-            zd=bi.low,
-            gg=bi.high,
-            dd=bi.low,
-            start=bi.start,
-            end=bi.end,
+            lines=list(lines),
+            zg=overlap_high,
+            zd=overlap_low,
+            gg=max(l.high for l in lines),
+            dd=min(l.low for l in lines),
+            start=lines[0].start,
+            end=lines[-1].end,
             index=len(self._zss),
         )
 

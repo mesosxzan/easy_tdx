@@ -8,6 +8,31 @@ import pandas as pd
 from easy_tdx.factor.base import Factor, register_factor
 
 
+def _ensure_datetime_col(df: pd.DataFrame) -> pd.DataFrame:
+    if "datetime" in df.columns or "date" in df.columns:
+        return df
+    out = df.copy()
+    if isinstance(out.index, pd.DatetimeIndex):
+        out["datetime"] = out.index
+        return out
+    dt = pd.to_datetime(out.index, errors="coerce")
+    if isinstance(dt, pd.DatetimeIndex) and len(dt.dropna()) > 0:
+        out["datetime"] = dt
+        return out
+    out["datetime"] = pd.date_range("2000-01-01", periods=len(out), freq="D")
+    return out
+
+
+def _ensure_vol_col(df: pd.DataFrame) -> pd.DataFrame:
+    if "vol" in df.columns:
+        return df
+    if "amount" not in df.columns:
+        return df
+    out = df.copy()
+    out["vol"] = out["amount"]
+    return out
+
+
 @register_factor
 class ChanlunBiDir(Factor):
     name = "chanlun_bi_dir"
@@ -19,26 +44,28 @@ class ChanlunBiDir(Factor):
         result = pd.Series(0.0, index=df.index, dtype=np.float64)
 
         try:
-            from easy_tdx.chanlun.analyser import ChanlunAnalyser
+            from easy_tdx.chanlun.incremental import IncrementalAnalyser
+            from easy_tdx.chanlun.types import Direction
 
-            analyser = ChanlunAnalyser(frequency="DAILY")
-            chanlun_result = analyser.process_klines(df)
+            df2 = _ensure_vol_col(_ensure_datetime_col(df))
+            analyser = IncrementalAnalyser(frequency="DAILY")
+            chanlun_result = analyser.process_klines(df2)
             bis = chanlun_result.bis
 
             if not bis:
                 return result
 
             for bi in bis:
-                direction = 1.0 if bi.direction == "up" else -1.0
-                start = getattr(bi, "start_index", 0)
-                end = getattr(bi, "end_index", len(df) - 1)
-                lo = max(0, start)
-                hi = min(len(df), end + 1)
-                result.iloc[lo:hi] = direction
+                direction = 1.0 if bi.direction == Direction.UP else -1.0
+                start = bi.start.k.k_index
+                end = bi.end.k.k_index
+                lo = max(0, min(start, end))
+                hi = min(len(df), max(start, end) + 1)
+                result.iloc[lo:hi] = np.float64(direction)
 
             last_bi = bis[-1]
-            direction = 1.0 if last_bi.direction == "up" else -1.0
-            result.iloc[-1] = direction
+            direction = 1.0 if last_bi.direction == Direction.UP else -1.0
+            result.iloc[-1] = np.float64(direction)
 
         except Exception:
             pass
@@ -68,21 +95,30 @@ class ChanlunMMD(Factor):
         result = pd.Series(0.0, index=df.index, dtype=np.float64)
 
         try:
-            from easy_tdx.chanlun.analyser import ChanlunAnalyser
+            from easy_tdx.chanlun.incremental import IncrementalAnalyser
 
-            analyser = ChanlunAnalyser(frequency="DAILY")
-            chanlun_result = analyser.process_klines(df)
-            mmds = chanlun_result.mmds
+            df2 = _ensure_vol_col(_ensure_datetime_col(df))
+            analyser = IncrementalAnalyser(frequency="DAILY")
+            chanlun_result = analyser.process_klines(df2)
 
-            if not mmds:
+            if chanlun_result.signals_by_bar:
+                for bar_idx, signals in chanlun_result.signals_by_bar.items():
+                    if not signals:
+                        continue
+                    mmd = signals[-1]
+                    value = self._MMD_MAP.get(mmd.mmd_type.value, 0.0)
+                    if 0 <= bar_idx < len(df):
+                        result.iloc[bar_idx] = np.float64(value)
                 return result
 
+            mmds = chanlun_result.mmds
             for mmd in mmds:
-                mmd_type = getattr(mmd, "type", "")
-                mmd_index = getattr(mmd, "index", -1)
-                value = self._MMD_MAP.get(mmd_type, 0.0)
-                if 0 <= mmd_index < len(df):
-                    result.iloc[mmd_index] = value
+                if mmd.bi is None:
+                    continue
+                bar_idx = mmd.bi.end.k.k_index
+                value = self._MMD_MAP.get(mmd.mmd_type.value, 0.0)
+                if 0 <= bar_idx < len(df):
+                    result.iloc[bar_idx] = np.float64(value)
 
         except Exception:
             pass

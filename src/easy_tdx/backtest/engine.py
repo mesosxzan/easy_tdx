@@ -14,7 +14,7 @@ from easy_tdx.backtest.orders import OrderSimulator
 from easy_tdx.backtest.performance import PerformanceAnalyzer
 from easy_tdx.backtest.portfolio import PortfolioTracker
 from easy_tdx.backtest.strategy import Strategy
-from easy_tdx.backtest.types import BacktestResult, Signal, Trade
+from easy_tdx.backtest.types import DATETIME_FMT, BacktestResult, Signal, Trade
 
 if TYPE_CHECKING:
     from easy_tdx.backtest.execution import ExecutionModel
@@ -249,7 +249,7 @@ class BacktestEngine:
         except (TypeError, ValueError):
             pass
         if hasattr(dt_col, "dt"):
-            dt_ints = dt_col.dt.strftime("%Y%m%d").astype(int)
+            dt_ints = dt_col.dt.strftime(DATETIME_FMT).astype(int)
             mask = dt_ints == datetime_val
             if mask.any():
                 return int(mask.idxmax())
@@ -390,7 +390,7 @@ class BacktestEngine:
                 # Get datetime for this bar
                 dt_val = df["datetime"].iloc[bar_index]
                 if hasattr(dt_val, "strftime"):
-                    dt_int = int(dt_val.strftime("%Y%m%d"))
+                    dt_int = int(dt_val.strftime(DATETIME_FMT))
                 else:
                     dt_int = int(dt_val)
 
