@@ -18,17 +18,24 @@ const props = withDefaults(defineProps<{
   selectedCodes?: string[]
   showBacktestBtn?: boolean
   backtestLoading?: boolean
+  /** 是否在每行显示单标【回测】按钮（单标回测页问财模式用） */
+  showStockBacktestBtn?: boolean
+  /** 单标回测进行中（禁用行内【回测】按钮，避免并发） */
+  stockBacktestLoading?: boolean
 }>(), {
   mode: 'single',
   selectedCodes: () => [],
   showBacktestBtn: false,
   backtestLoading: false,
+  showStockBacktestBtn: false,
+  stockBacktestLoading: false,
 })
 
 const emit = defineEmits<{
   pick: [code: string]
   add: [symbol: string]
   backtest: [query: string]
+  backtestStock: [row: WencaiActionRow]
 }>()
 
 const query = ref('')
@@ -100,6 +107,11 @@ function onBacktest() {
   emit('backtest', trimmed)
 }
 
+/** 行内单标【回测】：把该行标的交给父组件（填代码 + 取行情 + 回测）。 */
+function onStockBacktest(row: WencaiActionRow) {
+  emit('backtestStock', row)
+}
+
 function actionLabel(row: WencaiActionRow): string {
   if (props.mode === 'single') return '使用'
   return selectedCodeSet.value.has(row.symbol) ? '已添加' : '加入'
@@ -158,9 +170,19 @@ function isDisabled(row: WencaiActionRow): boolean {
               <span>{{ row.stockReason }}</span>
             </div>
           </div>
-          <button class="ghost-btn" :disabled="isDisabled(row)" @click="onUse(row)">
-            {{ actionLabel(row) }}
-          </button>
+          <div class="row-actions">
+            <button class="ghost-btn" :disabled="isDisabled(row)" @click="onUse(row)">
+              {{ actionLabel(row) }}
+            </button>
+            <button
+              v-if="showStockBacktestBtn"
+              class="stock-backtest-btn"
+              :disabled="stockBacktestLoading"
+              @click="onStockBacktest(row)"
+            >
+              {{ stockBacktestLoading ? '回测中…' : '回测' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -256,5 +278,25 @@ function isDisabled(row: WencaiActionRow): boolean {
 .ghost-btn {
   min-width: 54px;
   padding: 5px 10px;
+}
+.row-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.stock-backtest-btn {
+  min-width: 54px;
+  padding: 5px 10px;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid var(--accent);
+  white-space: nowrap;
+}
+.stock-backtest-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.stock-backtest-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 </style>

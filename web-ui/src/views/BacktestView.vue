@@ -219,6 +219,7 @@ async function onSave() {
           v-model:start-date="startDate"
           v-model:end-date="endDate"
           v-model:source="source"
+          @backtest="onRun"
         >
           <!-- 问财模式下：回测按钮与问财搜索按钮并排，免去滚到底部 -->
           <template #wencai-actions>

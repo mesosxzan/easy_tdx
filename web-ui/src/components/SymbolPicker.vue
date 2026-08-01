@@ -14,6 +14,9 @@ import WencaiSourcePanel from './WencaiSourcePanel.vue'
 
 const store = useBacktestStore()
 
+// 问财结果行内【回测】触发后，通知父组件（BacktestView）执行取行情 + 回测。
+const emit = defineEmits<{ backtest: [] }>()
+
 // 代码 / 周期 / 日期通过 defineModel 与父组件双向同步：
 // 既允许父组件读取（如寻优页「查看」按钮拼 URL 带上这些值），
 // 也允许父组件写入（如回测页从 URL query 回填表单）。
@@ -46,6 +49,12 @@ const detectedMarket = computed(() => (code.value && /^\d{6}$/.test(code.value)
 
 function applyWencaiCode(nextCode: string) {
   code.value = nextCode
+}
+
+/** 问财结果行内【回测】：填入该标的代码，再通知父组件触发取行情 + 回测。 */
+function onWencaiBacktestStock(row: { symbol: string }) {
+  applyWencaiCode(row.symbol)
+  emit('backtest')
 }
 
 /** 取行情（由父组件在点击「开始回测/开始寻优」时调用）。
@@ -126,7 +135,14 @@ defineExpose({ loadBars, loading })
 
     <div v-else class="field">
       <label>问财选股</label>
-      <WencaiSourcePanel mode="single" :selected-codes="[code]" @pick="applyWencaiCode">
+      <WencaiSourcePanel
+        mode="single"
+        :selected-codes="[code]"
+        :show-stock-backtest-btn="true"
+        :stock-backtest-loading="store.running"
+        @pick="applyWencaiCode"
+        @backtest-stock="onWencaiBacktestStock"
+      >
         <template #actions>
           <slot name="wencai-actions" />
         </template>
